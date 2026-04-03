@@ -1,0 +1,16 @@
+{
+  "name": "app-qr-menu",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "volta": {
+    "node": "22.14.0"
+  }
+}
