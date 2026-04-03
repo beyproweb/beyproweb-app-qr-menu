@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "Beypro Customer",
+    "slug": "app-qr-menu",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "beypro",
+    "plugins": [
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.beypro.customer",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera access is required for QR scan and ticket scan flows.",
+        "NSMicrophoneUsageDescription": "Microphone access is required for voice order and request-song features.",
+        "NSLocationWhenInUseUsageDescription": "Location access is required for delivery tracking and nearby map features."
+      },
+      "associatedDomains": [
+        "applinks:app.beypro.com"
+      ]
+    },
+    "android": {
+      "package": "com.beypro.customer",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.beypro.com",
+              "pathPrefix": "/"
+            }
+          ]
+        }
+      ]
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
+}
