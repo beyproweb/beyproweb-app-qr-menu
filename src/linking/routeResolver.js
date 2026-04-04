@@ -1,5 +1,6 @@
 import {
   APP_LINK_HOST,
+  DEFAULT_RESTAURANT_SLUG,
   DEEP_LINK_SCHEME,
   INTERNAL_HOSTS,
   INTERNAL_ROOT_DOMAIN,
@@ -25,6 +26,17 @@ const NON_RESTAURANT_ROOT_PATHS = new Set([
   'reserve',
   'concerts',
 ]);
+
+const MARKETPLACE_ROOT_PATHS = new Set(['marketplace', 'home']);
+
+function extractFirstPathSegment(pathname) {
+  if (!pathname || typeof pathname !== 'string') {
+    return '';
+  }
+
+  const segments = pathname.replace(/^\/+/, '').split('/').filter(Boolean);
+  return String(segments[0] || '').toLowerCase();
+}
 
 function extractRestaurantSlugFromPath(pathname) {
   if (!pathname || typeof pathname !== 'string') {
@@ -75,6 +87,33 @@ function mapSchemeUrlToWebUrl(urlObject) {
   return buildUrlFromBase(WEB_BASE_URL, normalizedPath, urlObject.search, urlObject.hash);
 }
 
+function mapExpoGoUrlToWebUrl(urlObject) {
+  const protocol = String(urlObject.protocol || '').toLowerCase();
+  if (protocol !== 'exp:' && protocol !== 'exps:') {
+    return null;
+  }
+
+  const embeddedUrlParam = String(
+    urlObject.searchParams.get('url') || urlObject.searchParams.get('linkingUri') || '',
+  ).trim();
+  if (embeddedUrlParam) {
+    const embeddedRoute = mapIncomingUrlToWebRoute(embeddedUrlParam);
+    if (embeddedRoute?.webUrl) {
+      return embeddedRoute.webUrl;
+    }
+  }
+
+  const pathname = String(urlObject.pathname || '');
+  const markerIndex = pathname.indexOf('/--/');
+  if (markerIndex >= 0) {
+    const expoPath = pathname.slice(markerIndex + 3);
+    const normalizedExpoPath = expoPath.startsWith('/') ? expoPath : `/${expoPath}`;
+    return buildUrlFromBase(WEB_BASE_URL, normalizedExpoPath, urlObject.search, urlObject.hash);
+  }
+
+  return null;
+}
+
 export function buildWebUrlForSlug(slug) {
   const sanitizedSlug = sanitizeRestaurantSlug(slug);
   if (!sanitizedSlug) {
@@ -84,9 +123,27 @@ export function buildWebUrlForSlug(slug) {
   return buildUrlFromBase(WEB_BASE_URL, `/${sanitizedSlug}`);
 }
 
+export function buildRestaurantActionWebUrl(slug, action = 'order') {
+  const sanitizedSlug = sanitizeRestaurantSlug(slug);
+  if (!sanitizedSlug) {
+    return buildDefaultWebUrl(null);
+  }
+
+  if (action === 'reserve') {
+    return buildUrlFromBase(WEB_BASE_URL, `/${sanitizedSlug}/reserve`);
+  }
+
+  if (action === 'tickets' || action === 'ticket') {
+    return buildUrlFromBase(WEB_BASE_URL, `/${sanitizedSlug}/concerts`);
+  }
+
+  return buildWebUrlForSlug(sanitizedSlug);
+}
+
 export function buildDefaultWebUrl(savedSlug) {
-  const slugUrl = buildWebUrlForSlug(savedSlug);
-  if (savedSlug) {
+  const fallbackSlug = savedSlug || DEFAULT_RESTAURANT_SLUG;
+  const slugUrl = buildWebUrlForSlug(fallbackSlug);
+  if (fallbackSlug) {
     return slugUrl;
   }
 
@@ -99,11 +156,26 @@ export function mapIncomingUrlToWebRoute(incomingUrl) {
     return null;
   }
 
+  const protocol = String(parsedUrl.protocol || '').toLowerCase();
+  const isSchemeDeepLink = protocol === `${DEEP_LINK_SCHEME}:`;
+  if (isSchemeDeepLink) {
+    const schemePath = `${parsedUrl.host}${parsedUrl.pathname}`;
+    const normalizedPath = schemePath.startsWith('/') ? schemePath : `/${schemePath}`;
+    const firstSegment = extractFirstPathSegment(normalizedPath);
+    if (MARKETPLACE_ROOT_PATHS.has(firstSegment)) {
+      return {
+        appMode: 'marketplace',
+        slug: null,
+        webUrl: null,
+      };
+    }
+  }
+
   let mappedWebUrl = null;
   if (isHttpUrl(parsedUrl)) {
     mappedWebUrl = mapHttpUrlToWebUrl(parsedUrl);
   } else {
-    mappedWebUrl = mapSchemeUrlToWebUrl(parsedUrl);
+    mappedWebUrl = mapSchemeUrlToWebUrl(parsedUrl) || mapExpoGoUrlToWebUrl(parsedUrl);
   }
 
   if (!mappedWebUrl) {

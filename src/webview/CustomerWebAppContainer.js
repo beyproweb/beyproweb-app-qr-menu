@@ -73,9 +73,10 @@ export function CustomerWebAppContainer({
       allowsInlineMediaPlayback
       allowsLinkPreview={false}
       allowsProtectedMedia
-      autoManageStatusBarEnabled={false}
-      automaticallyAdjustContentInsets={false}
+      autoManageStatusBarEnabled
+      automaticallyAdjustContentInsets
       cacheEnabled
+      contentInsetAdjustmentBehavior="automatic"
       domStorageEnabled
       geolocationEnabled
       javaScriptEnabled
@@ -127,6 +128,7 @@ export function CustomerWebAppContainer({
       setSupportMultipleWindows={false}
       sharedCookiesEnabled
       source={{ uri: sourceUrl }}
+      style={{ flex: 1 }}
       thirdPartyCookiesEnabled
     />
   );

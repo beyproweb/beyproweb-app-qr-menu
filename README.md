@@ -4,11 +4,15 @@ Dedicated Beypro customer mobile app wrapper for the production QR Menu + Order 
 
 This app keeps the current web customer flows as source of truth by loading the production Beypro QR Menu in a mobile WebView, with app-level deep-link routing, splash/loading handling, back navigation, and error recovery.
 
+Phase 1 now includes a lightweight native marketplace home for normal app opens, while QR/deep-link/slug entry still opens the target restaurant flow directly.
+
 ## Link strategy
 
 - Public web links stay unchanged: `https://www.beypro.com/{restaurant_slug}`
 - Mobile app links: `https://app.beypro.com/{restaurant_slug}`
 - App links are mapped to the web renderer URL internally, so opening `app.beypro.com/<path>` loads `www.beypro.com/<path>` in-app.
+- App opened without a deep link starts on the native marketplace home.
+- App opened with QR/deep-link/slug continues to bypass marketplace and open the target restaurant directly.
 
 ## Project structure
 
@@ -16,6 +20,12 @@ This app keeps the current web customer flows as source of truth by loading the 
 - `src/shell/CustomerMobileApp.js`: app shell and lifecycle
 - `src/config/`: central URL/config/constants
 - `src/linking/`: deep-link parsing + route/slug resolution
+- `src/marketplace/`: Phase 1 marketplace module
+  - `screens/`: marketplace home/detail/navigator
+  - `components/`: reusable cards, chips, sections, badges, search
+  - `hooks/`: marketplace state composition
+  - `services/`: seed catalog + local persistence helpers
+  - `utils/`: filtering/presentation helpers
 - `src/webview/CustomerWebAppContainer.js`: WebView container + safe external-link behavior
 - `src/storage/`: persisted customer session helpers (last restaurant slug)
 - `src/ui/`: loading and error states
@@ -28,7 +38,9 @@ Optional overrides (defaults shown):
 - `EXPO_PUBLIC_APP_LINK_BASE_URL=https://app.beypro.com`
 - `EXPO_PUBLIC_DEEP_LINK_SCHEME=beypro`
 - `EXPO_PUBLIC_WEB_ENTRY_PATH=/menu` (default QR menu entry route when no slug is provided)
+- `EXPO_PUBLIC_DEFAULT_RESTAURANT_SLUG=` (optional; useful for Expo Go testing fallback)
 - `EXPO_PUBLIC_INTERNAL_HOSTS=` (comma-separated extra internal hosts)
+- `EXPO_PUBLIC_MARKETPLACE_API_URL=https://hurrypos-backend.onrender.com/api/public/marketplace/restaurants` (marketplace restaurant feed)
 
 ## Run
 

@@ -1,5 +1,7 @@
 export const STORAGE_KEYS = {
+  favoriteRestaurants: 'beypro_customer_favorite_restaurants',
   lastRestaurantSlug: 'beypro_customer_last_restaurant_slug',
+  recentRestaurants: 'beypro_customer_recent_restaurants',
 };
 
 export const UI_TEXT = {

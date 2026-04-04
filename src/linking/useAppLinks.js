@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 
 import * as Linking from 'expo-linking';
 
-import { getLastRestaurantSlug, setLastRestaurantSlug } from '../storage/sessionStore';
+import { pushRecentRestaurantSlug, setLastRestaurantSlug } from '../storage/sessionStore';
 import {
-  buildDefaultWebUrl,
+  buildRestaurantActionWebUrl,
   extractSlugFromInternalWebUrl,
   mapIncomingUrlToWebRoute,
 } from './routeResolver';
@@ -14,87 +14,129 @@ const BOOTSTRAP_TIMEOUT_MS = 8000;
 export function useAppLinks() {
   const [state, setState] = useState({
     activeSlug: null,
+    appMode: 'marketplace',
     initializing: true,
     navigationKey: 0,
-    targetWebUrl: buildDefaultWebUrl(null),
+    targetWebUrl: null,
   });
 
+  const persistLastVisit = useCallback((slug) => {
+    if (!slug) {
+      return;
+    }
+
+    setLastRestaurantSlug(slug);
+    pushRecentRestaurantSlug(slug);
+  }, []);
+
   const applyRoute = useCallback((route) => {
-    if (!route || !route.webUrl) {
+    if (!route) {
+      return;
+    }
+
+    if (route.appMode === 'marketplace') {
+      setState((previousState) => ({
+        ...previousState,
+        activeSlug: null,
+        appMode: 'marketplace',
+        navigationKey: previousState.navigationKey,
+        targetWebUrl: null,
+      }));
+      return;
+    }
+
+    if (!route.webUrl) {
       return;
     }
 
     setState((previousState) => ({
       ...previousState,
       activeSlug: route.slug || null,
+      appMode: 'web',
       navigationKey: previousState.navigationKey + 1,
       targetWebUrl: route.webUrl,
     }));
 
     if (route.slug) {
-      setLastRestaurantSlug(route.slug);
+      persistLastVisit(route.slug);
     }
-  }, []);
+  }, [persistLastVisit]);
 
   useEffect(() => {
     let isMounted = true;
     let timeoutId = null;
 
-    const finishBootstrap = (route) => {
-      if (!isMounted || !route?.webUrl) {
+    const finishBootstrap = (nextState) => {
+      if (!isMounted || !nextState) {
         return;
       }
 
       setState((previousState) => ({
         ...previousState,
-        activeSlug: route.slug || null,
+        activeSlug: nextState.activeSlug || null,
+        appMode: nextState.appMode,
         initializing: false,
-        navigationKey: previousState.navigationKey + 1,
-        targetWebUrl: route.webUrl,
+        navigationKey: nextState.navigationKey
+          ? previousState.navigationKey + 1
+          : previousState.navigationKey,
+        targetWebUrl: nextState.targetWebUrl || null,
       }));
-
-      if (route.slug) {
-        setLastRestaurantSlug(route.slug);
-      }
     };
 
     async function bootstrapFromInitialLink() {
       let initialUrl = null;
-      let savedSlug = null;
 
       try {
-        [initialUrl, savedSlug] = await Promise.all([
-          Linking.getInitialURL(),
-          getLastRestaurantSlug(),
-        ]);
+        initialUrl = await Linking.getInitialURL();
       } catch {
-        try {
-          savedSlug = await getLastRestaurantSlug();
-        } catch {
-          savedSlug = null;
-        }
+        initialUrl = null;
       }
 
       const initialRoute = mapIncomingUrlToWebRoute(initialUrl);
-      const fallbackRoute = {
-        slug: savedSlug || null,
-        webUrl: buildDefaultWebUrl(savedSlug),
-      };
 
       if (timeoutId) {
         clearTimeout(timeoutId);
         timeoutId = null;
       }
 
-      finishBootstrap(initialRoute || fallbackRoute);
+      if (initialRoute) {
+        if (initialRoute.appMode === 'marketplace') {
+          finishBootstrap({
+            activeSlug: null,
+            appMode: 'marketplace',
+            navigationKey: false,
+            targetWebUrl: null,
+          });
+          return;
+        }
+
+        finishBootstrap({
+          activeSlug: initialRoute.slug || null,
+          appMode: 'web',
+          navigationKey: true,
+          targetWebUrl: initialRoute.webUrl,
+        });
+        if (initialRoute.slug) {
+          persistLastVisit(initialRoute.slug);
+        }
+        return;
+      }
+
+      finishBootstrap({
+        activeSlug: null,
+        appMode: 'marketplace',
+        navigationKey: false,
+        targetWebUrl: null,
+      });
     }
 
     timeoutId = setTimeout(() => {
-      const fallbackRoute = {
-        slug: null,
-        webUrl: buildDefaultWebUrl(null),
-      };
-      finishBootstrap(fallbackRoute);
+      finishBootstrap({
+        activeSlug: null,
+        appMode: 'marketplace',
+        navigationKey: false,
+        targetWebUrl: null,
+      });
     }, BOOTSTRAP_TIMEOUT_MS);
 
     bootstrapFromInitialLink();
@@ -113,7 +155,18 @@ export function useAppLinks() {
       }
       subscription.remove();
     };
-  }, [applyRoute]);
+  }, [applyRoute, persistLastVisit]);
+
+  const openRestaurantRoute = useCallback(
+    ({ action = 'order', slug }) => {
+      const webUrl = buildRestaurantActionWebUrl(slug, action);
+      applyRoute({
+        slug,
+        webUrl,
+      });
+    },
+    [applyRoute],
+  );
 
   const trackInternalWebNavigation = useCallback((nextUrl) => {
     const slug = extractSlugFromInternalWebUrl(nextUrl);
@@ -132,12 +185,13 @@ export function useAppLinks() {
       };
     });
 
-    setLastRestaurantSlug(slug);
-  }, []);
+    persistLastVisit(slug);
+  }, [persistLastVisit]);
 
   return {
     ...state,
     applyRoute,
+    openRestaurantRoute,
     trackInternalWebNavigation,
   };
 }

@@ -8,7 +8,17 @@
     },
     "updates": {
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/99b533ba-6690-4159-b3ad-dd3113a37e9c"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content",
+      "translucent": false
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content"
     },
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -48,7 +58,7 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "autoVerify": false,
+          "autoVerify": true,
           "category": [
             "BROWSABLE",
             "DEFAULT"
@@ -65,6 +75,12 @@
     },
     "assetBundlePatterns": [
       "**/*"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "99b533ba-6690-4159-b3ad-dd3113a37e9c"
+      }
+    },
+    "owner": "hurry_bey"
   }
 }
