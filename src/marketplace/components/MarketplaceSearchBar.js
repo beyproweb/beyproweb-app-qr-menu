@@ -9,7 +9,7 @@ export function MarketplaceSearchBar({ onChangeText, value }) {
         autoCorrect={false}
         clearButtonMode="while-editing"
         onChangeText={onChangeText}
-        placeholder="Search restaurants, cuisine, features"
+        placeholder="Search places, food, or experiences"
         placeholderTextColor="#8b95a1"
         returnKeyType="search"
         style={styles.input}
@@ -21,17 +21,23 @@ export function MarketplaceSearchBar({ onChangeText, value }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f5f7fa',
-    borderColor: '#e6eaf0',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 3,
+    backgroundColor: '#f4f6f8',
+    borderRadius: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    shadowColor: '#0f1720',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    elevation: 1,
   },
   input: {
-    color: '#16202a',
+    color: '#1a232d',
     fontSize: 15,
-    fontWeight: '500',
-    minHeight: 42,
+    fontWeight: '400',
+    minHeight: 46,
   },
 });

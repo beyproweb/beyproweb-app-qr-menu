@@ -30,25 +30,22 @@ export function CategoryChips({ categories, onSelectCategory, selectedCategory }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    gap: 8,
-    paddingVertical: 2,
+    gap: 9,
+    paddingVertical: 4,
   },
   chip: {
-    backgroundColor: '#f3f6f9',
-    borderColor: '#e5eaf0',
+    backgroundColor: '#f5f7fa',
     borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
   },
   chipActive: {
-    backgroundColor: '#1a1f26',
-    borderColor: '#1a1f26',
+    backgroundColor: '#222b35',
   },
   chipLabel: {
-    color: '#475361',
+    color: '#5e6a77',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   chipLabelActive: {
     color: '#ffffff',

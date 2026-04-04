@@ -46,6 +46,7 @@ function shouldAllowInAppNavigation(url) {
 
 export function CustomerWebAppContainer({
   navigationKey,
+  onMarketplaceRequest,
   onNavigationStateChange,
   onPageError,
   onPageLoadEnd,
@@ -65,6 +66,27 @@ export function CustomerWebAppContainer({
 
     return true;
   }, []);
+
+  const handleMessage = useCallback(
+    (event) => {
+      const rawPayload = String(event?.nativeEvent?.data || '').trim();
+      if (!rawPayload) {
+        return;
+      }
+
+      let payload = null;
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch {
+        return;
+      }
+
+      if (payload?.action === 'OPEN_MARKETPLACE') {
+        onMarketplaceRequest?.();
+      }
+    },
+    [onMarketplaceRequest],
+  );
 
   return (
     <WebView
@@ -121,6 +143,7 @@ export function CustomerWebAppContainer({
         onTrackInternalUrl?.(navigationState.url);
         onNavigationStateChange?.(navigationState);
       }}
+      onMessage={handleMessage}
       onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
       originWhitelist={['*']}
       pullToRefreshEnabled

@@ -123,6 +123,7 @@ export function useMarketplaceData() {
     favoriteSlugs,
     featuredRestaurants,
     findRestaurantBySlug,
+    filteredRestaurants,
     loading,
     nearbyRestaurants,
     recentRestaurants,

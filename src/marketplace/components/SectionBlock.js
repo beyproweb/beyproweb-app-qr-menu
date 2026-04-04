@@ -23,7 +23,7 @@ export function SectionEmptyState({ message }) {
 
 const styles = StyleSheet.create({
   section: {
-    gap: 12,
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
@@ -32,26 +32,24 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: {
-    color: '#151c24',
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    color: '#1f2933',
+    fontSize: 18,
+    fontWeight: '500',
+    letterSpacing: -0.1,
   },
   subtitle: {
-    color: '#7d8895',
-    fontSize: 12,
-    fontWeight: '500',
+    color: '#98a3af',
+    fontSize: 11,
+    fontWeight: '400',
   },
   emptyContainer: {
     backgroundColor: '#f6f8fb',
-    borderColor: '#e4e9ef',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   emptyText: {
-    color: '#6c7784',
+    color: '#6f7b88',
     fontSize: 13,
     fontWeight: '500',
   },

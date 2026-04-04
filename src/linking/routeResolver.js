@@ -171,6 +171,20 @@ export function mapIncomingUrlToWebRoute(incomingUrl) {
     }
   }
 
+  if (isHttpUrl(parsedUrl)) {
+    const firstSegment = extractFirstPathSegment(parsedUrl.pathname);
+    const isAppLinkHost = parsedUrl.host === APP_LINK_HOST;
+
+    // Keep normal app opens on marketplace home for app-link host roots.
+    if ((isAppLinkHost && !firstSegment) || MARKETPLACE_ROOT_PATHS.has(firstSegment)) {
+      return {
+        appMode: 'marketplace',
+        slug: null,
+        webUrl: null,
+      };
+    }
+  }
+
   let mappedWebUrl = null;
   if (isHttpUrl(parsedUrl)) {
     mappedWebUrl = mapHttpUrlToWebUrl(parsedUrl);

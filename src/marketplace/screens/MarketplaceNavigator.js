@@ -18,6 +18,7 @@ export function MarketplaceNavigator({ onOpenRestaurantFlow }) {
         favoriteRestaurants={marketplace.favoriteRestaurants}
         favoriteSlugs={marketplace.favoriteSlugs}
         featuredRestaurants={marketplace.featuredRestaurants}
+        filteredRestaurants={marketplace.filteredRestaurants}
         loading={marketplace.loading}
         nearbyRestaurants={marketplace.nearbyRestaurants}
         onOpenRestaurant={handleOpenRestaurant}

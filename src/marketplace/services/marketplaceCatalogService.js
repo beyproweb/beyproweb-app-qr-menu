@@ -4,12 +4,13 @@ import { sanitizeRestaurantSlug } from '../../utils/url';
 const FALLBACK_RESTAURANTS = [
   {
     id: 'fallback-1',
-    slug: 'beypro-demo-food',
-    name: 'Beypro Demo Food',
+    slug: 'demo-food',
+    name: 'Demo Food',
+    app_icon: '',
     logo: '',
     cover_image: '',
     venue_type: 'Food',
-    short_description: 'Marketplace fallback venue while live feed is unavailable.',
+    short_description: 'Sample venue while live feed is unavailable.',
     is_open: true,
     supports_qr_order: true,
     supports_reservation: true,
@@ -65,6 +66,7 @@ function normalizeRestaurantRecord(record, index) {
 
   const id = sanitizeText(record.id) || `${slug}-${index}`;
   const name = sanitizeText(record.name) || slug;
+  const appIcon = sanitizeText(record.app_icon);
   const logo = sanitizeText(record.logo);
   const coverImage = sanitizeText(record.cover_image);
   const shortDescription =
@@ -74,6 +76,7 @@ function normalizeRestaurantRecord(record, index) {
     id,
     slug,
     name,
+    app_icon: appIcon,
     logo,
     cover_image: coverImage || logo,
     venue_type: sanitizeText(record.venue_type) || 'Food',

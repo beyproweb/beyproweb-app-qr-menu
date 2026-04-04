@@ -3,7 +3,6 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   formatDistanceLabel,
-  formatRestaurantSubtitle,
   getRestaurantFeatureBadges,
 } from '../utils/restaurantPresentation';
 import { FeatureBadgeList } from './FeatureBadgeList';
@@ -30,8 +29,8 @@ export function RestaurantCard({
   }
 
   const featureBadges = getRestaurantFeatureBadges(restaurant);
-  const subtitle = formatRestaurantSubtitle(restaurant);
   const distanceLabel = formatDistanceLabel(restaurant.distance_km);
+  const avatarUri = String(restaurant.app_icon || restaurant.logo || '').trim();
 
   return (
     <Pressable onPress={onPress} style={[styles.card, compact ? styles.cardCompact : null]}>
@@ -48,7 +47,7 @@ export function RestaurantCard({
             style={[styles.favoriteButton, isFavorite ? styles.favoriteButtonActive : null]}
           >
             <Text style={[styles.favoriteText, isFavorite ? styles.favoriteTextActive : null]}>
-              {isFavorite ? 'Saved' : 'Save'}
+              {isFavorite ? '★' : '☆'}
             </Text>
           </Pressable>
         </View>
@@ -56,7 +55,15 @@ export function RestaurantCard({
 
       <View style={styles.content}>
         <View style={styles.titleRow}>
-          <Image source={{ uri: restaurant.logo }} style={styles.logo} />
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.logo} />
+          ) : (
+            <View style={[styles.logo, styles.logoFallback]}>
+              <Text style={styles.logoFallbackText}>
+                {String(restaurant.name || '?').trim().charAt(0).toUpperCase() || '?'}
+              </Text>
+            </View>
+          )}
           <View style={styles.titleBlock}>
             <Text numberOfLines={1} style={styles.name}>
               {restaurant.name}
@@ -67,9 +74,6 @@ export function RestaurantCard({
           </View>
         </View>
 
-        <Text numberOfLines={2} style={styles.subtitle}>
-          {subtitle}
-        </Text>
         {distanceLabel ? <Text style={styles.distance}>{distanceLabel}</Text> : null}
 
         <FeatureBadgeList badges={featureBadges} compact={compact} />
@@ -81,25 +85,23 @@ export function RestaurantCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderColor: '#e5eaf1',
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#0f1720',
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 7,
     },
-    width: 272,
-    elevation: 3,
+    width: 292,
+    elevation: 2,
   },
   cardCompact: {
     width: '100%',
   },
   coverWrap: {
-    height: 128,
+    height: 152,
     position: 'relative',
   },
   coverImage: {
@@ -138,26 +140,29 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 7,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderRadius: 999,
+    height: 28,
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   favoriteButtonActive: {
     backgroundColor: '#151c24',
   },
   favoriteText: {
-    color: '#22303e',
-    fontSize: 11,
-    fontWeight: '700',
+    color: '#3a4652',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   favoriteTextActive: {
-    color: '#ffffff',
+    color: '#f8d34b',
   },
   content: {
-    gap: 9,
-    paddingHorizontal: 13,
-    paddingTop: 12,
-    paddingBottom: 13,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
   },
   titleRow: {
     alignItems: 'center',
@@ -165,38 +170,40 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logo: {
-    borderColor: '#e6ecf3',
+    alignItems: 'center',
+    borderColor: '#e8edf3',
     borderRadius: 10,
     borderWidth: 1,
-    height: 42,
-    width: 42,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  logoFallback: {
+    backgroundColor: '#f3f7fb',
+  },
+  logoFallbackText: {
+    color: '#415161',
+    fontSize: 16,
+    fontWeight: '700',
   },
   titleBlock: {
     flex: 1,
   },
   name: {
     color: '#141b22',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     letterSpacing: -0.15,
   },
   venueType: {
-    color: '#64707d',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  subtitle: {
-    color: '#4f5b67',
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
+    color: '#9aa5b1',
+    fontSize: 11,
+    fontWeight: '400',
+    marginTop: 3,
   },
   distance: {
-    color: '#6e7a87',
+    color: '#b6bfc9',
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    textTransform: 'uppercase',
+    fontWeight: '400',
   },
 });

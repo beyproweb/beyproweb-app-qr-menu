@@ -3,7 +3,16 @@ const CATEGORY_MATCHERS = {
   food: (restaurant) => String(restaurant.venue_type || '').toLowerCase().includes('food'),
   cafe: (restaurant) => String(restaurant.venue_type || '').toLowerCase().includes('cafe'),
   pub: (restaurant) => String(restaurant.venue_type || '').toLowerCase().includes('pub'),
-  live_music: (restaurant) => String(restaurant.venue_type || '').toLowerCase().includes('live'),
+  live_music: (restaurant) => {
+    const venueType = String(restaurant.venue_type || '').toLowerCase();
+    return (
+      venueType.includes('live') ||
+      venueType.includes('music') ||
+      venueType.includes('concert') ||
+      venueType.includes('event') ||
+      Boolean(restaurant.supports_tickets)
+    );
+  },
   reservation: (restaurant) => Boolean(restaurant.supports_reservation),
   delivery: (restaurant) => Boolean(restaurant.supports_delivery),
 };

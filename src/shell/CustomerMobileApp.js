@@ -23,6 +23,7 @@ export function CustomerMobileApp() {
 
   const {
     appMode,
+    applyRoute,
     initializing,
     navigationKey,
     openRestaurantRoute,
@@ -178,6 +179,10 @@ export function CustomerMobileApp() {
     [hideNativeSplash],
   );
 
+  const handleMarketplaceRequest = useCallback(() => {
+    applyRoute({ appMode: 'marketplace' });
+  }, [applyRoute]);
+
   if (initializing) {
     return <LoadingState subtitle={UI_TEXT.loadingSubtitle} title={UI_TEXT.loadingTitle} />;
   }
@@ -219,6 +224,7 @@ export function CustomerMobileApp() {
       >
         <CustomerWebAppContainer
           navigationKey={effectiveNavigationKey}
+          onMarketplaceRequest={handleMarketplaceRequest}
           onNavigationStateChange={(navigationState) => {
             setCanGoBack(navigationState.canGoBack);
           }}

@@ -9,7 +9,7 @@ import { SectionBlock, SectionEmptyState } from '../components/SectionBlock';
 function HorizontalRestaurantRail({ favoriteSlugs, onOpenRestaurant, onToggleFavorite, restaurants }) {
   const list = Array.isArray(restaurants) ? restaurants : [];
   if (!list.length) {
-    return <SectionEmptyState message="No matching restaurants right now." />;
+    return <SectionEmptyState message="No places found nearby. Try another area or search." />;
   }
 
   return (
@@ -34,7 +34,7 @@ function HorizontalRestaurantRail({ favoriteSlugs, onOpenRestaurant, onToggleFav
 function VerticalRestaurantList({ favoriteSlugs, onOpenRestaurant, onToggleFavorite, restaurants }) {
   const list = Array.isArray(restaurants) ? restaurants : [];
   if (!list.length) {
-    return <SectionEmptyState message="Nearby discovery will improve as more venues are synced." />;
+    return <SectionEmptyState message="No places found nearby. Try another area or search." />;
   }
 
   return (
@@ -58,6 +58,7 @@ export function MarketplaceHomeScreen({
   favoriteRestaurants,
   favoriteSlugs,
   featuredRestaurants,
+  filteredRestaurants,
   loading,
   nearbyRestaurants,
   onOpenRestaurant,
@@ -74,11 +75,6 @@ export function MarketplaceHomeScreen({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>Beypro Marketplace</Text>
-        <Text style={styles.subtitle}>Discover restaurants powered by Beypro</Text>
-      </View>
-
       <MarketplaceSearchBar onChangeText={onSetSearchQuery} value={searchQuery} />
       <CategoryChips
         categories={categories}
@@ -89,11 +85,11 @@ export function MarketplaceHomeScreen({
       {loading ? (
         <View style={styles.loadingState}>
           <ActivityIndicator color="#253140" />
-          <Text style={styles.loadingText}>Loading marketplace...</Text>
+          <Text style={styles.loadingText}>Loading places...</Text>
         </View>
       ) : (
         <View style={styles.sectionsWrap}>
-          <SectionBlock subtitle="Based on your latest visits" title="Recent Restaurants">
+          <SectionBlock title="Recently visited">
             <HorizontalRestaurantRail
               favoriteSlugs={favoriteSlugs}
               onOpenRestaurant={onOpenRestaurant}
@@ -102,7 +98,7 @@ export function MarketplaceHomeScreen({
             />
           </SectionBlock>
 
-          <SectionBlock subtitle="Saved locally on this device" title="Favorite Restaurants">
+          <SectionBlock title="Favorites">
             <HorizontalRestaurantRail
               favoriteSlugs={favoriteSlugs}
               onOpenRestaurant={onOpenRestaurant}
@@ -111,7 +107,7 @@ export function MarketplaceHomeScreen({
             />
           </SectionBlock>
 
-          <SectionBlock subtitle="Curated by Beypro" title="Featured Restaurants">
+          <SectionBlock title="Popular places">
             <HorizontalRestaurantRail
               favoriteSlugs={favoriteSlugs}
               onOpenRestaurant={onOpenRestaurant}
@@ -120,12 +116,21 @@ export function MarketplaceHomeScreen({
             />
           </SectionBlock>
 
-          <SectionBlock subtitle="Closest venues right now" title="Nearby Restaurants">
+          <SectionBlock title="Nearby">
             <VerticalRestaurantList
               favoriteSlugs={favoriteSlugs}
               onOpenRestaurant={onOpenRestaurant}
               onToggleFavorite={onToggleFavorite}
               restaurants={nearbyRestaurants}
+            />
+          </SectionBlock>
+
+          <SectionBlock title="All places">
+            <VerticalRestaurantList
+              favoriteSlugs={favoriteSlugs}
+              onOpenRestaurant={onOpenRestaurant}
+              onToggleFavorite={onToggleFavorite}
+              restaurants={filteredRestaurants}
             />
           </SectionBlock>
         </View>
@@ -136,35 +141,18 @@ export function MarketplaceHomeScreen({
 
 const styles = StyleSheet.create({
   content: {
-    gap: 14,
+    gap: 16,
     paddingHorizontal: 16,
-    paddingBottom: 30,
-    paddingTop: 8,
-  },
-  header: {
-    gap: 4,
-    marginBottom: 2,
-  },
-  title: {
-    color: '#0f1720',
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-  },
-  subtitle: {
-    color: '#63707d',
-    fontSize: 14,
-    fontWeight: '500',
+    paddingBottom: 40,
+    paddingTop: 16,
   },
   loadingState: {
     alignItems: 'center',
     backgroundColor: '#f7f9fc',
-    borderColor: '#e6ebf1',
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 14,
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 26,
   },
   loadingText: {
     color: '#667281',
@@ -172,13 +160,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionsWrap: {
-    gap: 24,
+    gap: 36,
   },
   horizontalRailContent: {
-    gap: 12,
-    paddingRight: 6,
+    gap: 14,
+    paddingRight: 10,
   },
   verticalList: {
-    gap: 12,
+    gap: 14,
   },
 });
