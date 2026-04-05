@@ -26,6 +26,7 @@ export function CustomerMobileApp() {
     applyRoute,
     initializing,
     navigationKey,
+    openAuthRoute,
     openRestaurantRoute,
     targetWebUrl,
     trackInternalWebNavigation,
@@ -199,7 +200,10 @@ export function CustomerMobileApp() {
             },
           ]}
         >
-          <MarketplaceNavigator onOpenRestaurantFlow={openRestaurantRoute} />
+          <MarketplaceNavigator
+            onOpenAuthFlow={openAuthRoute}
+            onOpenRestaurantFlow={openRestaurantRoute}
+          />
         </View>
       </View>
     );

@@ -140,6 +140,17 @@ export function buildRestaurantActionWebUrl(slug, action = 'order') {
   return buildWebUrlForSlug(sanitizedSlug);
 }
 
+export function buildAuthWebUrl(action = 'login') {
+  const normalizedAction = String(action || '').toLowerCase();
+  const authMode =
+    normalizedAction === 'register' || normalizedAction === 'signup' || normalizedAction === 'sign-up'
+      ? 'register'
+      : 'login';
+
+  // QR customer auth lives inside QR Menu UI, so route through menu entry with auth intent.
+  return buildUrlFromBase(WEB_BASE_URL, WEB_ENTRY_PATH, `?auth=${authMode}`);
+}
+
 export function buildDefaultWebUrl(savedSlug) {
   const fallbackSlug = savedSlug || DEFAULT_RESTAURANT_SLUG;
   const slugUrl = buildWebUrlForSlug(fallbackSlug);

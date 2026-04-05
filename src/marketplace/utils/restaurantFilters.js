@@ -13,6 +13,9 @@ const CATEGORY_MATCHERS = {
       Boolean(restaurant.supports_tickets)
     );
   },
+  grocery: (restaurant) =>
+    Boolean(restaurant.supports_delivery) || Boolean(restaurant.supports_pickup),
+  tickets: (restaurant) => Boolean(restaurant.supports_tickets),
   reservation: (restaurant) => Boolean(restaurant.supports_reservation),
   delivery: (restaurant) => Boolean(restaurant.supports_delivery),
 };

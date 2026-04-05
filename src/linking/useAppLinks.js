@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 
 import { pushRecentRestaurantSlug, setLastRestaurantSlug } from '../storage/sessionStore';
 import {
+  buildAuthWebUrl,
   buildRestaurantActionWebUrl,
   extractSlugFromInternalWebUrl,
   mapIncomingUrlToWebRoute,
@@ -168,6 +169,17 @@ export function useAppLinks() {
     [applyRoute],
   );
 
+  const openAuthRoute = useCallback(
+    (action = 'login') => {
+      const webUrl = buildAuthWebUrl(action);
+      applyRoute({
+        slug: null,
+        webUrl,
+      });
+    },
+    [applyRoute],
+  );
+
   const trackInternalWebNavigation = useCallback((nextUrl) => {
     const slug = extractSlugFromInternalWebUrl(nextUrl);
     if (!slug) {
@@ -191,6 +203,7 @@ export function useAppLinks() {
   return {
     ...state,
     applyRoute,
+    openAuthRoute,
     openRestaurantRoute,
     trackInternalWebNavigation,
   };

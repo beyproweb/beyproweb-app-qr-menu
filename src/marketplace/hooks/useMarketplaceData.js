@@ -10,12 +10,14 @@ import { filterRestaurants, mapRestaurantsBySlug } from '../utils/restaurantFilt
 
 const MARKETPLACE_CATEGORIES = [
   { id: 'all', label: 'All' },
-  { id: 'food', label: 'Food' },
+  { id: 'food', label: 'Restaurants' },
+  { id: 'live_music', label: 'Events' },
+  { id: 'grocery', label: 'Grocery' },
+  { id: 'tickets', label: 'Tickets' },
+  { id: 'delivery', label: 'Delivery' },
+  { id: 'reservation', label: 'Reservation' },
   { id: 'cafe', label: 'Cafe' },
   { id: 'pub', label: 'Pub' },
-  { id: 'live_music', label: 'Live Music' },
-  { id: 'reservation', label: 'Reservation' },
-  { id: 'delivery', label: 'Delivery' },
 ];
 
 function sortByDistanceAscending(restaurants) {
