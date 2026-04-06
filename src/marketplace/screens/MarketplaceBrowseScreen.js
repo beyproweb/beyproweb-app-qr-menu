@@ -83,26 +83,6 @@ function HeaderMenuButton({ onPress }) {
   );
 }
 
-function HeaderAlertButton({ badgeCount, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.headerIconButton, pressed ? styles.scalePressed : null]}
-    >
-      <View style={styles.alertGlyphWrap}>
-        <View style={styles.alertGlyphTop} />
-        <View style={styles.alertGlyphBody} />
-        <View style={styles.alertGlyphDot} />
-      </View>
-      {badgeCount ? (
-        <View style={styles.iconBadge}>
-          <Text style={styles.iconBadgeText}>{badgeCount}</Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
 function CategoryPill({ isActive, item, onPress }) {
   return (
     <Pressable
@@ -378,7 +358,6 @@ export function MarketplaceBrowseScreen({
                   {normalizedLocationLabel}
                 </Text>
               </Pressable>
-              <HeaderAlertButton badgeCount={2} onPress={() => {}} />
             </View>
           </View>
         </View>
@@ -495,10 +474,6 @@ export function MarketplaceBrowseScreen({
           style={[styles.drawerBackdrop, !isDrawerOpen ? styles.drawerBackdropHidden : null]}
         />
         <View style={[styles.drawerPanel, !isDrawerOpen ? styles.drawerPanelClosed : null]}>
-          <View style={styles.drawerHeader}>
-            <Image resizeMode="contain" source={BEYALL_LOGO} style={styles.drawerLogo} />
-            <Text style={styles.drawerTitle}>Navigation</Text>
-          </View>
           <View style={styles.drawerLocationBadge}>
             <Text numberOfLines={1} style={styles.drawerLocationText}>
               {normalizedLocationLabel}
@@ -571,6 +546,9 @@ export function MarketplaceBrowseScreen({
                 </Pressable>
               </>
             )}
+          </View>
+          <View style={styles.drawerFooterLogoWrap}>
+            <Image resizeMode="contain" source={BEYALL_LOGO} style={styles.drawerFooterLogo} />
           </View>
         </View>
       </View>
@@ -677,17 +655,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 18,
   },
-  headerIconButton: {
-    alignItems: 'center',
-    backgroundColor: '#f1f5fb',
-    borderColor: '#dce4f2',
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: 'center',
-    position: 'relative',
-    width: 32,
-  },
   menuGlyphWrap: {
     gap: 3,
     width: 14,
@@ -700,49 +667,6 @@ const styles = StyleSheet.create({
   },
   menuGlyphLineMid: {
     width: '72%',
-  },
-  alertGlyphWrap: {
-    alignItems: 'center',
-    height: 16,
-    justifyContent: 'flex-end',
-    width: 14,
-  },
-  alertGlyphTop: {
-    backgroundColor: '#334155',
-    borderRadius: 999,
-    height: 2,
-    marginBottom: 1,
-    width: 5,
-  },
-  alertGlyphBody: {
-    borderColor: '#334155',
-    borderRadius: 6,
-    borderWidth: 1.6,
-    height: 10,
-    width: 10,
-  },
-  alertGlyphDot: {
-    backgroundColor: '#334155',
-    borderRadius: 999,
-    height: 2.8,
-    marginTop: 1.5,
-    width: 2.8,
-  },
-  iconBadge: {
-    alignItems: 'center',
-    backgroundColor: '#5B2EFF',
-    borderRadius: 999,
-    height: 17,
-    justifyContent: 'center',
-    minWidth: 17,
-    position: 'absolute',
-    right: -4,
-    top: -4,
-  },
-  iconBadgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '800',
   },
   searchContainer: {
     alignItems: 'center',
@@ -1094,10 +1018,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomRightRadius: 24,
     borderTopRightRadius: 24,
-    bottom: 0,
+    bottom: 8,
+    flexDirection: 'column',
     left: 0,
     paddingHorizontal: 18,
-    paddingTop: 56,
+    paddingBottom: 14,
+    paddingTop: 24,
     position: 'absolute',
     shadowColor: '#0f172a',
     shadowOffset: {
@@ -1106,31 +1032,18 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.14,
     shadowRadius: 14,
-    top: 0,
+    top: 8,
     width: 268,
     elevation: 16,
   },
   drawerPanelClosed: {
     transform: [{ translateX: -288 }],
   },
-  drawerHeader: {
-    gap: 3,
-  },
-  drawerLogo: {
-    height: 24,
-    width: 96,
-  },
-  drawerTitle: {
-    color: '#0f172a',
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
   drawerLocationBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#f1f5fb',
     borderRadius: 999,
-    marginTop: 14,
+    marginTop: 6,
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
@@ -1142,11 +1055,19 @@ const styles = StyleSheet.create({
   },
   drawerTabList: {
     gap: 10,
-    marginTop: 24,
+    marginTop: 16,
   },
   drawerAuthActions: {
     gap: 10,
-    marginTop: 26,
+    marginTop: 18,
+  },
+  drawerFooterLogoWrap: {
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  drawerFooterLogo: {
+    height: 54,
+    width: 210,
   },
   drawerProfileBadge: {
     backgroundColor: '#eef2ff',
