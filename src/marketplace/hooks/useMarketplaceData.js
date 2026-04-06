@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { getRecentRestaurantSlugs } from '../../storage/sessionStore';
 import { fetchMarketplaceRestaurants } from '../services/marketplaceCatalogService';
-import { reverseGeocodeCity } from '../services/locationService';
+import { reverseGeocodeAddress, reverseGeocodeCity } from '../services/locationService';
 import {
   getFavoriteRestaurantSlugs,
   setFavoriteRestaurantSlugs,
@@ -22,6 +22,21 @@ const MARKETPLACE_CATEGORIES = [
   { id: 'cafe', label: 'Cafe' },
   { id: 'pub', label: 'Pub' },
 ];
+
+function getRestaurantKey(restaurant) {
+  if (!restaurant || typeof restaurant !== 'object') {
+    return '';
+  }
+  const slug = String(restaurant.slug || '').trim();
+  if (slug) {
+    return `slug:${slug.toLowerCase()}`;
+  }
+  const id = Number(restaurant.id);
+  if (Number.isFinite(id) && id > 0) {
+    return `id:${id}`;
+  }
+  return '';
+}
 
 function sortByDistanceAscending(restaurants) {
   return [...restaurants].sort((left, right) => {
@@ -70,6 +85,7 @@ export function useMarketplaceData() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [detectedAddress, setDetectedAddress] = useState('');
   const [detectedCity, setDetectedCity] = useState('');
   const location = useCurrentLocation();
 
@@ -112,6 +128,10 @@ export function useMarketplaceData() {
     () => filterRestaurants(restaurants, searchQuery, selectedCategory),
     [restaurants, searchQuery, selectedCategory],
   );
+  const searchRestaurants = useMemo(
+    () => filterRestaurants(restaurants, searchQuery, 'all'),
+    [restaurants, searchQuery],
+  );
 
   const filteredBySlug = useMemo(() => mapRestaurantsBySlug(filteredRestaurants), [filteredRestaurants]);
 
@@ -146,22 +166,37 @@ export function useMarketplaceData() {
       ).slice(0, 8),
     [nearbyRestaurantsByLocation, searchQuery, selectedCategory],
   );
+  const nearbyRestaurantKeys = useMemo(
+    () =>
+      nearbyRestaurantsByLocation
+        .map((restaurant) => getRestaurantKey(restaurant))
+        .filter(Boolean),
+    [nearbyRestaurantsByLocation],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     async function resolveDetectedCity() {
       if (!Number.isFinite(Number(location.latitude)) || !Number.isFinite(Number(location.longitude))) {
+        setDetectedAddress('');
         setDetectedCity('');
         return;
       }
 
-      const city = await reverseGeocodeCity({
-        latitude: location.latitude,
-        longitude: location.longitude,
-      });
+      const [city, address] = await Promise.all([
+        reverseGeocodeCity({
+          latitude: location.latitude,
+          longitude: location.longitude,
+        }),
+        reverseGeocodeAddress({
+          latitude: location.latitude,
+          longitude: location.longitude,
+        }),
+      ]);
 
       if (!cancelled) {
+        setDetectedAddress(address || '');
         setDetectedCity(city || '');
       }
     }
@@ -196,6 +231,24 @@ export function useMarketplaceData() {
     }
     return 'Near you';
   }, [detectedCity, fallbackCity, location.error, location.loading]);
+  const locationAddress = useMemo(() => {
+    if (detectedAddress) {
+      return detectedAddress;
+    }
+    if (detectedCity) {
+      return detectedCity;
+    }
+    if (fallbackCity) {
+      return fallbackCity;
+    }
+    if (location.loading) {
+      return 'Locating...';
+    }
+    if (location.error) {
+      return 'Location off';
+    }
+    return 'Near you';
+  }, [detectedAddress, detectedCity, fallbackCity, location.error, location.loading]);
 
   const nearbyLoading =
     location.loading || (!location.error && nearbyFeed.loading);
@@ -226,13 +279,18 @@ export function useMarketplaceData() {
     favoriteSlugs,
     findRestaurantBySlug,
     filteredRestaurants,
+    nearbyRestaurantKeys,
+    locationAddress,
+    locationLatitude: location.latitude,
     locationLabel,
+    locationLongitude: location.longitude,
     loading,
     nearbyError,
     nearbyLoading,
     nearbyRestaurants: nearbyFilteredRestaurants,
     recentRestaurants,
     refreshPersistedLists,
+    searchRestaurants,
     searchQuery,
     selectedCategory,
     setSearchQuery,

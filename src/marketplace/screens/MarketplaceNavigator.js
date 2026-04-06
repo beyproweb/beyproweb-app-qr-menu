@@ -135,7 +135,11 @@ export function MarketplaceNavigator({ authState, onOpenAuthFlow, onOpenRestaura
           favoriteSlugs={marketplace.favoriteSlugs}
           filteredRestaurants={marketplace.filteredRestaurants}
           isAuthenticated={authState.isAuthenticated}
+          locationAddress={marketplace.locationAddress}
+          locationLatitude={marketplace.locationLatitude}
           locationLabel={marketplace.locationLabel}
+          locationLongitude={marketplace.locationLongitude}
+          nearbyRestaurantKeys={marketplace.nearbyRestaurantKeys}
           nearbyError={marketplace.nearbyError}
           nearbyLoading={marketplace.nearbyLoading}
           nearbyRestaurants={marketplace.nearbyRestaurants}
@@ -147,6 +151,7 @@ export function MarketplaceNavigator({ authState, onOpenAuthFlow, onOpenRestaura
           onSetSearchQuery={marketplace.setSearchQuery}
           onToggleFavorite={marketplace.toggleFavorite}
           recentRestaurants={marketplace.recentRestaurants}
+          searchRestaurants={marketplace.searchRestaurants}
           searchQuery={marketplace.searchQuery}
           selectedCategory={marketplace.selectedCategory}
         />

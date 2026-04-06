@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Image,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { searchAddressSuggestions } from '../services/locationService';
 
 const CATEGORY_ITEMS = [
   {
@@ -68,6 +70,45 @@ function resolveCoverImage(restaurant) {
   return String(restaurant?.cover_image || restaurant?.logo || restaurant?.app_icon || '').trim();
 }
 
+function resolveAddressLabel(restaurant) {
+  if (!restaurant) {
+    return '';
+  }
+
+  const direct = String(
+    restaurant?.location ||
+      restaurant?.address ||
+      restaurant?.street_address ||
+      restaurant?.city ||
+      '',
+  ).trim();
+  if (direct) {
+    return direct;
+  }
+
+  const district = String(restaurant?.district || '').trim();
+  const city = String(restaurant?.city || '').trim();
+  if (district && city) {
+    return `${district}, ${city}`;
+  }
+  return district || city || '';
+}
+
+function getRestaurantKey(restaurant) {
+  if (!restaurant || typeof restaurant !== 'object') {
+    return '';
+  }
+  const slug = String(restaurant.slug || '').trim();
+  if (slug) {
+    return `slug:${slug.toLowerCase()}`;
+  }
+  const id = Number(restaurant.id);
+  if (Number.isFinite(id) && id > 0) {
+    return `id:${id}`;
+  }
+  return '';
+}
+
 function HeaderMenuButton({ onPress }) {
   return (
     <Pressable
@@ -112,7 +153,7 @@ function CategoryPill({ isActive, item, onPress }) {
   );
 }
 
-function TopPickCard({ onOpenRestaurant, restaurant }) {
+function TopPickCard({ isOutOfRange = false, onOpenRestaurant, restaurant }) {
   if (!restaurant) {
     return null;
   }
@@ -144,9 +185,15 @@ function TopPickCard({ onOpenRestaurant, restaurant }) {
         <Text style={styles.topPickMeta}>
           {hasDistance ? `${distanceKm.toFixed(1)} km away` : `${rating} rating (${reviewCount})`}
         </Text>
-        <View style={styles.deliveryBadge}>
-          <Text style={styles.deliveryBadgeText}>Free Delivery</Text>
-        </View>
+        {isOutOfRange ? (
+          <View style={styles.outOfRangeBadge}>
+            <Text style={styles.outOfRangeBadgeText}>Out of range</Text>
+          </View>
+        ) : (
+          <View style={styles.deliveryBadge}>
+            <Text style={styles.deliveryBadgeText}>Free Delivery</Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -231,7 +278,11 @@ export function MarketplaceBrowseScreen({
   currentCustomer,
   filteredRestaurants,
   isAuthenticated,
+  locationAddress,
+  locationLatitude,
   locationLabel,
+  locationLongitude,
+  nearbyRestaurantKeys,
   nearbyError,
   nearbyLoading,
   nearbyRestaurants,
@@ -242,15 +293,41 @@ export function MarketplaceBrowseScreen({
   onSelectCategory,
   onSetSearchQuery,
   searchQuery,
+  searchRestaurants,
   selectedCategory,
 }) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+  const [isAddressPickerOpen, setIsAddressPickerOpen] = React.useState(false);
+  const [addressQuery, setAddressQuery] = React.useState('');
+  const [addressSearchLoading, setAddressSearchLoading] = React.useState(false);
   const [activeDrawerTab, setActiveDrawerTab] = React.useState('home');
+  const [remoteAddressSuggestions, setRemoteAddressSuggestions] = React.useState([]);
+  const [selectedAddressLabel, setSelectedAddressLabel] = React.useState('');
   const [headerElevated, setHeaderElevated] = React.useState(false);
-  const topPicks = React.useMemo(() => {
+  const nearbyTopPicks = React.useMemo(() => {
     const nearbyList = Array.isArray(nearbyRestaurants) ? nearbyRestaurants : [];
     return nearbyList.slice(0, 8);
   }, [nearbyRestaurants]);
+  const isSearchActive = React.useMemo(
+    () => String(searchQuery || '').trim().length > 0,
+    [searchQuery],
+  );
+  const normalizedNearbyKeySet = React.useMemo(
+    () =>
+      new Set(
+        (Array.isArray(nearbyRestaurantKeys) ? nearbyRestaurantKeys : [])
+          .map((item) => String(item || '').trim())
+          .filter(Boolean),
+      ),
+    [nearbyRestaurantKeys],
+  );
+  const browseRestaurants = React.useMemo(() => {
+    if (isSearchActive) {
+      const list = Array.isArray(searchRestaurants) ? searchRestaurants : [];
+      return list.slice(0, 40);
+    }
+    return nearbyTopPicks;
+  }, [isSearchActive, nearbyTopPicks, searchRestaurants]);
 
   const nearbyEvents = React.useMemo(() => {
     const list = Array.isArray(filteredRestaurants) ? filteredRestaurants : [];
@@ -267,12 +344,21 @@ export function MarketplaceBrowseScreen({
     if (events.length) {
       return events.slice(0, 6);
     }
-    return topPicks.slice(0, 6);
-  }, [filteredRestaurants, topPicks]);
+    return nearbyTopPicks.slice(0, 6);
+  }, [filteredRestaurants, nearbyTopPicks]);
 
+  const baseLocationLabel = React.useMemo(() => String(locationLabel || '').trim(), [locationLabel]);
+  const geolocationAddressLabel = React.useMemo(
+    () => String(locationAddress || '').trim(),
+    [locationAddress],
+  );
+  const effectiveLocationLabel = React.useMemo(
+    () => String(selectedAddressLabel || baseLocationLabel || 'Locating...').trim(),
+    [baseLocationLabel, selectedAddressLabel],
+  );
   const normalizedLocationLabel = React.useMemo(
-    () => String(locationLabel || 'Locating...').trim().toUpperCase(),
-    [locationLabel],
+    () => effectiveLocationLabel.toUpperCase(),
+    [effectiveLocationLabel],
   );
   const customerDisplayName = React.useMemo(
     () => String(currentCustomer?.name || 'Customer').trim(),
@@ -288,6 +374,67 @@ export function MarketplaceBrowseScreen({
     ],
     [],
   );
+  const addressSuggestions = React.useMemo(() => {
+    const unique = new Set();
+    const suggestions = [];
+    const addSuggestion = (value) => {
+      const text = String(value || '').trim();
+      if (!text) {
+        return;
+      }
+      const key = text.toLowerCase();
+      if (unique.has(key)) {
+        return;
+      }
+      unique.add(key);
+      suggestions.push(text);
+    };
+
+    addSuggestion(geolocationAddressLabel);
+    addSuggestion(baseLocationLabel);
+    (Array.isArray(nearbyRestaurants) ? nearbyRestaurants : []).forEach((restaurant) => {
+      addSuggestion(resolveAddressLabel(restaurant));
+    });
+    (Array.isArray(filteredRestaurants) ? filteredRestaurants : []).forEach((restaurant) => {
+      addSuggestion(resolveAddressLabel(restaurant));
+    });
+
+    return suggestions.slice(0, 12);
+  }, [baseLocationLabel, filteredRestaurants, geolocationAddressLabel, nearbyRestaurants]);
+  const filteredAddressSuggestions = React.useMemo(() => {
+    const query = String(addressQuery || '').trim().toLowerCase();
+    if (!query) {
+      return addressSuggestions.slice(0, 8);
+    }
+    return addressSuggestions
+      .filter((item) => item.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [addressQuery, addressSuggestions]);
+  const displayedAddressSuggestions = React.useMemo(() => {
+    const query = String(addressQuery || '').trim();
+    if (!query) {
+      return filteredAddressSuggestions;
+    }
+
+    const dedup = new Set();
+    const combined = [];
+    const pushUnique = (value) => {
+      const text = String(value || '').trim();
+      if (!text) {
+        return;
+      }
+      const key = text.toLowerCase();
+      if (dedup.has(key)) {
+        return;
+      }
+      dedup.add(key);
+      combined.push(text);
+    };
+
+    remoteAddressSuggestions.forEach(pushUnique);
+    filteredAddressSuggestions.forEach(pushUnique);
+    return combined.slice(0, 8);
+  }, [addressQuery, filteredAddressSuggestions, remoteAddressSuggestions]);
 
   const handleSelectDrawerTab = React.useCallback((tabId) => {
     setActiveDrawerTab(tabId);
@@ -304,6 +451,63 @@ export function MarketplaceBrowseScreen({
     const shouldElevate = offsetY > 8;
     setHeaderElevated((previous) => (previous === shouldElevate ? previous : shouldElevate));
   }, []);
+  const handleOpenAddressPicker = React.useCallback(() => {
+    setIsDrawerOpen(false);
+    setAddressQuery(geolocationAddressLabel || effectiveLocationLabel || '');
+    setIsAddressPickerOpen(true);
+  }, [effectiveLocationLabel, geolocationAddressLabel]);
+  const handleCloseAddressPicker = React.useCallback(() => {
+    setIsAddressPickerOpen(false);
+  }, []);
+  const handleUseCurrentLocation = React.useCallback(() => {
+    setSelectedAddressLabel(geolocationAddressLabel || baseLocationLabel || 'Near you');
+    setAddressQuery('');
+    setIsAddressPickerOpen(false);
+  }, [baseLocationLabel, geolocationAddressLabel]);
+  const handleSelectAddress = React.useCallback((value) => {
+    const next = String(value || '').trim();
+    if (!next) {
+      return;
+    }
+    setSelectedAddressLabel(next);
+    setAddressQuery('');
+    setIsAddressPickerOpen(false);
+  }, []);
+  React.useEffect(() => {
+    if (!isAddressPickerOpen) {
+      setAddressSearchLoading(false);
+      setRemoteAddressSuggestions([]);
+      return;
+    }
+
+    const query = String(addressQuery || '').trim();
+    if (query.length < 2) {
+      setAddressSearchLoading(false);
+      setRemoteAddressSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = setTimeout(async () => {
+      setAddressSearchLoading(true);
+      const suggestions = await searchAddressSuggestions({
+        query,
+        latitude: locationLatitude,
+        longitude: locationLongitude,
+        limit: 8,
+      });
+      if (cancelled) {
+        return;
+      }
+      setRemoteAddressSuggestions(Array.isArray(suggestions) ? suggestions : []);
+      setAddressSearchLoading(false);
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [addressQuery, isAddressPickerOpen, locationLatitude, locationLongitude]);
 
   return (
     <View style={styles.screen}>
@@ -349,7 +553,10 @@ export function MarketplaceBrowseScreen({
               </View>
             </View>
             <View style={styles.headerRightControls}>
-              <Pressable style={({ pressed }) => [styles.locationButton, pressed ? styles.scalePressed : null]}>
+              <Pressable
+                onPress={handleOpenAddressPicker}
+                style={({ pressed }) => [styles.locationButton, pressed ? styles.scalePressed : null]}
+              >
                 <View style={styles.locationIconWrap}>
                   <View style={styles.locationGlyph} />
                   <View style={styles.locationGlyphStem} />
@@ -415,7 +622,9 @@ export function MarketplaceBrowseScreen({
         </ScrollView>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Nearby Restaurants</Text>
+          <Text style={styles.sectionTitle}>
+            {isSearchActive ? 'Search Results' : 'Nearby Restaurants'}
+          </Text>
         </View>
         {nearbyLoading ? (
           <NearbySkeletonRow />
@@ -424,10 +633,16 @@ export function MarketplaceBrowseScreen({
             <Text style={styles.loadingText}>Unable to detect nearby restaurants.</Text>
             <Text style={styles.loadingSubText}>{nearbyStateError}</Text>
           </View>
-        ) : topPicks.length === 0 ? (
+        ) : browseRestaurants.length === 0 ? (
           <View style={styles.loadingState}>
-            <Text style={styles.loadingText}>No restaurants near you</Text>
-            <Text style={styles.loadingSubText}>Try changing category or search radius.</Text>
+            <Text style={styles.loadingText}>
+              {isSearchActive ? 'No restaurants found' : 'No restaurants near you'}
+            </Text>
+            <Text style={styles.loadingSubText}>
+              {isSearchActive
+                ? 'Try another restaurant name.'
+                : 'Try changing category or search radius.'}
+            </Text>
           </View>
         ) : (
           <ScrollView
@@ -435,9 +650,13 @@ export function MarketplaceBrowseScreen({
             horizontal
             showsHorizontalScrollIndicator={false}
           >
-            {topPicks.map((restaurant) => (
+            {browseRestaurants.map((restaurant, index) => (
               <TopPickCard
-                key={restaurant.id}
+                key={getRestaurantKey(restaurant) || `search-restaurant-${index}`}
+                isOutOfRange={
+                  isSearchActive &&
+                  !normalizedNearbyKeySet.has(getRestaurantKey(restaurant))
+                }
                 onOpenRestaurant={onOpenRestaurant}
                 restaurant={restaurant}
               />
@@ -467,6 +686,103 @@ export function MarketplaceBrowseScreen({
           <Image resizeMode="contain" source={BEYALL_LOGO} style={styles.bottomPageLogo} />
         </View>
       </ScrollView>
+
+      <View pointerEvents={isAddressPickerOpen ? 'auto' : 'none'} style={styles.addressPickerRoot}>
+        <Pressable
+          onPress={handleCloseAddressPicker}
+          style={[
+            styles.addressPickerBackdrop,
+            !isAddressPickerOpen ? styles.addressPickerBackdropHidden : null,
+          ]}
+        />
+        <View
+          style={[
+            styles.addressPickerSheet,
+            !isAddressPickerOpen ? styles.addressPickerSheetClosed : null,
+          ]}
+        >
+          <View style={styles.addressHandle} />
+          <Text style={styles.addressTitle}>Where to?</Text>
+          <Text style={styles.addressSubtitle}>Select your delivery address</Text>
+
+          <View style={styles.addressSearchInputWrap}>
+            <TextInput
+              autoCapitalize="words"
+              autoCorrect={false}
+              onChangeText={setAddressQuery}
+              placeholder="Search address"
+              placeholderTextColor="#8b95a1"
+              style={styles.addressSearchInput}
+              value={addressQuery}
+            />
+          </View>
+
+          <Pressable
+            onPress={handleUseCurrentLocation}
+            style={({ pressed }) => [
+              styles.currentLocationRow,
+              pressed ? styles.scalePressed : null,
+            ]}
+          >
+            <View style={styles.currentLocationDot} />
+            <View style={styles.currentLocationTextWrap}>
+              <Text numberOfLines={1} style={styles.currentLocationTitle}>
+                Use current location
+              </Text>
+              <Text numberOfLines={1} style={styles.currentLocationSubtitle}>
+                {effectiveLocationLabel}
+              </Text>
+            </View>
+          </Pressable>
+
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.addressList}
+          >
+            {displayedAddressSuggestions.length ? (
+              displayedAddressSuggestions.map((item, index) => (
+                <Pressable
+                  key={`${item}-${index}`}
+                  onPress={() => handleSelectAddress(item)}
+                  style={({ pressed }) => [
+                    styles.addressListItem,
+                    pressed ? styles.scalePressed : null,
+                  ]}
+                >
+                  <View style={styles.addressListPin} />
+                  <Text numberOfLines={2} style={styles.addressListText}>
+                    {item}
+                  </Text>
+                </Pressable>
+              ))
+            ) : addressSearchLoading ? (
+              <View style={styles.addressEmptyState}>
+                <ActivityIndicator color="#5B2EFF" size="small" />
+                <Text style={styles.addressEmptyText}>Searching nearby addresses...</Text>
+              </View>
+            ) : (
+              <View style={styles.addressEmptyState}>
+                <Text style={styles.addressEmptyText}>No addresses found</Text>
+              </View>
+            )}
+          </ScrollView>
+
+          {String(addressQuery || '').trim() ? (
+            <Pressable
+              onPress={() => handleSelectAddress(addressQuery)}
+              style={({ pressed }) => [
+                styles.addressConfirmButton,
+                pressed ? styles.scalePressed : null,
+              ]}
+            >
+              <Text numberOfLines={1} style={styles.addressConfirmButtonText}>
+                Use "{String(addressQuery).trim()}"
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
 
       <View pointerEvents={isDrawerOpen ? 'auto' : 'none'} style={styles.drawerRoot}>
         <Pressable
@@ -931,6 +1247,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  outOfRangeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff1f2',
+    borderColor: '#fecdd3',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  outOfRangeBadgeText: {
+    color: '#be123c',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   eventCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -994,6 +1324,155 @@ const styles = StyleSheet.create({
   eventCtaText: {
     color: '#ffffff',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  addressPickerRoot: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 50,
+  },
+  addressPickerBackdrop: {
+    backgroundColor: 'rgba(2, 8, 23, 0.34)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  addressPickerBackdropHidden: {
+    opacity: 0,
+  },
+  addressPickerSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    bottom: 0,
+    maxHeight: '78%',
+    minHeight: 360,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  addressPickerSheetClosed: {
+    transform: [{ translateY: 560 }],
+  },
+  addressHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#d8deea',
+    borderRadius: 999,
+    height: 4,
+    width: 46,
+  },
+  addressTitle: {
+    color: '#0f172a',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginTop: 12,
+  },
+  addressSubtitle: {
+    color: '#667085',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  addressSearchInputWrap: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 13,
+    borderWidth: 1,
+    marginTop: 14,
+    paddingHorizontal: 12,
+  },
+  addressSearchInput: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '500',
+    minHeight: 44,
+  },
+  currentLocationRow: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    minHeight: 54,
+    paddingHorizontal: 12,
+  },
+  currentLocationDot: {
+    backgroundColor: '#5B2EFF',
+    borderRadius: 999,
+    height: 10,
+    width: 10,
+  },
+  currentLocationTextWrap: {
+    flex: 1,
+  },
+  currentLocationTitle: {
+    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  currentLocationSubtitle: {
+    color: '#667085',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  addressList: {
+    marginTop: 10,
+  },
+  addressListItem: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 50,
+    paddingHorizontal: 10,
+  },
+  addressListPin: {
+    backgroundColor: '#dbe4f4',
+    borderRadius: 999,
+    height: 8,
+    width: 8,
+  },
+  addressListText: {
+    color: '#1f2937',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  addressEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  addressEmptyText: {
+    color: '#8a93a1',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addressConfirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#5B2EFF',
+    borderRadius: 12,
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  addressConfirmButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '700',
   },
   drawerRoot: {
@@ -1066,8 +1545,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   drawerFooterLogo: {
-    height: 54,
-    width: 210,
+    height: 68,
+    width: 263,
   },
   drawerProfileBadge: {
     backgroundColor: '#eef2ff',
