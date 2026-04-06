@@ -1,4 +1,4 @@
-import { MARKETPLACE_API_URL } from '../../config/urls';
+import { MARKETPLACE_API_URL, NEARBY_RESTAURANTS_API_URL } from '../../config/urls';
 import { sanitizeRestaurantSlug } from '../../utils/url';
 
 const FALLBACK_RESTAURANTS = [
@@ -54,6 +54,11 @@ function normalizeDistance(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+function normalizeCoordinate(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function normalizeRestaurantRecord(record, index) {
   if (!record || typeof record !== 'object') {
     return null;
@@ -90,15 +95,37 @@ function normalizeRestaurantRecord(record, index) {
     is_featured: normalizeBoolean(record.is_featured, false),
     location: sanitizeText(record.location),
     distance_km: normalizeDistance(record.distance_km),
+    pos_location_lat: normalizeCoordinate(record.pos_location_lat),
+    pos_location_lng: normalizeCoordinate(record.pos_location_lng),
   };
 }
 
-async function fetchMarketplaceFromApi() {
-  const response = await fetch(MARKETPLACE_API_URL, {
+function extractRestaurantsFromPayload(payload) {
+  return Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.restaurants)
+      ? payload.restaurants
+      : [];
+}
+
+function buildRequestUrl(baseUrl, query = {}) {
+  const url = new URL(baseUrl);
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+}
+
+async function fetchRestaurantsFromApi(url, signal) {
+  const response = await fetch(url, {
     headers: {
       Accept: 'application/json',
     },
     method: 'GET',
+    signal,
   });
 
   if (!response.ok) {
@@ -106,15 +133,38 @@ async function fetchMarketplaceFromApi() {
   }
 
   const payload = await response.json();
-  const restaurants = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.restaurants)
-      ? payload.restaurants
-      : [];
+  const restaurants = extractRestaurantsFromPayload(payload);
 
   return restaurants
     .map((record, index) => normalizeRestaurantRecord(record, index))
     .filter(Boolean);
+}
+
+async function fetchMarketplaceFromApi(signal) {
+  return fetchRestaurantsFromApi(MARKETPLACE_API_URL, signal);
+}
+
+export async function fetchNearbyRestaurants({
+  latitude,
+  longitude,
+  radiusKm = 5,
+  signal,
+} = {}) {
+  const requestQuery = {
+    lat: latitude,
+    lng: longitude,
+    radius: radiusKm,
+  };
+
+  const nearbyUrl = buildRequestUrl(NEARBY_RESTAURANTS_API_URL, requestQuery);
+  try {
+    const nearbyRestaurants = await fetchRestaurantsFromApi(nearbyUrl, signal);
+    return nearbyRestaurants;
+  } catch {
+    // Backward-compatible fallback while nearby endpoint is being rolled out.
+    const marketplaceUrl = buildRequestUrl(MARKETPLACE_API_URL, requestQuery);
+    return fetchRestaurantsFromApi(marketplaceUrl, signal);
+  }
 }
 
 export async function fetchMarketplaceRestaurants() {

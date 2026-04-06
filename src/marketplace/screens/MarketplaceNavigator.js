@@ -41,11 +41,13 @@ export function MarketplaceNavigator({ onOpenAuthFlow, onOpenRestaurantFlow }) {
           categories={marketplace.categories}
           favoriteRestaurants={marketplace.favoriteRestaurants}
           favoriteSlugs={marketplace.favoriteSlugs}
-          featuredRestaurants={marketplace.featuredRestaurants}
           filteredRestaurants={marketplace.filteredRestaurants}
-          loading={marketplace.loading}
+          locationLabel={marketplace.locationLabel}
+          nearbyError={marketplace.nearbyError}
+          nearbyLoading={marketplace.nearbyLoading}
           nearbyRestaurants={marketplace.nearbyRestaurants}
           onOpenRestaurant={handleOpenRestaurant}
+          onOpenAuth={handleOpenAuth}
           onOpenTickets={handleOpenTickets}
           onSelectCategory={marketplace.setSelectedCategory}
           onSetSearchQuery={marketplace.setSearchQuery}

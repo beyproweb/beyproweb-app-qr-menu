@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -14,31 +13,26 @@ import { LinearGradient } from 'expo-linear-gradient';
 const CATEGORY_ITEMS = [
   {
     badge: '',
-    icon: '🍔',
     id: 'food',
     label: 'Restaurants',
   },
   {
     badge: 'NEW',
-    icon: '🎉',
     id: 'live_music',
     label: 'Events',
   },
   {
     badge: '',
-    icon: '🛒',
     id: 'grocery',
     label: 'Grocery',
   },
   {
     badge: '',
-    icon: '🎟',
     id: 'tickets',
     label: 'Tickets',
   },
   {
     badge: '',
-    icon: '🔍',
     id: 'all',
     label: 'All',
   },
@@ -74,10 +68,32 @@ function resolveCoverImage(restaurant) {
   return String(restaurant?.cover_image || restaurant?.logo || restaurant?.app_icon || '').trim();
 }
 
-function HeaderIconButton({ badgeCount, icon }) {
+function HeaderMenuButton({ onPress }) {
   return (
-    <Pressable style={({ pressed }) => [styles.headerIconButton, pressed ? styles.scalePressed : null]}>
-      <Text style={styles.headerIconText}>{icon}</Text>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.drawerTriggerButton, pressed ? styles.scalePressed : null]}
+    >
+      <View style={styles.menuGlyphWrap}>
+        <View style={styles.menuGlyphLine} />
+        <View style={[styles.menuGlyphLine, styles.menuGlyphLineMid]} />
+        <View style={styles.menuGlyphLine} />
+      </View>
+    </Pressable>
+  );
+}
+
+function HeaderAlertButton({ badgeCount, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.headerIconButton, pressed ? styles.scalePressed : null]}
+    >
+      <View style={styles.alertGlyphWrap}>
+        <View style={styles.alertGlyphTop} />
+        <View style={styles.alertGlyphBody} />
+        <View style={styles.alertGlyphDot} />
+      </View>
       {badgeCount ? (
         <View style={styles.iconBadge}>
           <Text style={styles.iconBadgeText}>{badgeCount}</Text>
@@ -103,7 +119,6 @@ function CategoryPill({ isActive, item, onPress }) {
         start={{ x: 0, y: 0.5 }}
         style={[styles.categoryPill, isActive ? styles.categoryPillActive : null]}
       >
-        <Text style={styles.categoryIcon}>{item.icon}</Text>
         <Text style={[styles.categoryLabel, isActive ? styles.categoryLabelActive : null]}>
           {item.label}
         </Text>
@@ -123,6 +138,8 @@ function TopPickCard({ onOpenRestaurant, restaurant }) {
   }
 
   const imageUri = resolveCoverImage(restaurant);
+  const distanceKm = Number(restaurant?.distance_km);
+  const hasDistance = Number.isFinite(distanceKm) && distanceKm >= 0;
   const rating = ratingLabel(restaurant.slug);
   const reviewCount = reviewCountLabel(restaurant.slug);
 
@@ -145,13 +162,34 @@ function TopPickCard({ onOpenRestaurant, restaurant }) {
           {restaurant.name}
         </Text>
         <Text style={styles.topPickMeta}>
-          ⭐ {rating} ({reviewCount})
+          {hasDistance ? `${distanceKm.toFixed(1)} km away` : `${rating} rating (${reviewCount})`}
         </Text>
         <View style={styles.deliveryBadge}>
           <Text style={styles.deliveryBadgeText}>Free Delivery</Text>
         </View>
       </View>
     </Pressable>
+  );
+}
+
+function NearbySkeletonRow() {
+  return (
+    <ScrollView
+      contentContainerStyle={styles.horizontalCardsContent}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+    >
+      {[0, 1, 2].map((index) => (
+        <View key={`nearby-skeleton-${index}`} style={styles.topPickCard}>
+          <View style={[styles.topPickImage, styles.skeletonBlock]} />
+          <View style={styles.topPickContent}>
+            <View style={[styles.skeletonLine, styles.skeletonLinePrimary]} />
+            <View style={[styles.skeletonLine, styles.skeletonLineSecondary]} />
+            <View style={[styles.skeletonLine, styles.skeletonLineTertiary]} />
+          </View>
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -189,7 +227,7 @@ function EventCard({ index, onOpenTickets, restaurant }) {
           {restaurant.name}
         </Text>
         <Text style={styles.eventMeta}>
-          ⭐ {rating} • {attendees} attending
+          {rating} rating | {attendees} attending
         </Text>
         <Pressable
           onPress={() => onOpenTickets?.(restaurant.slug)}
@@ -209,46 +247,13 @@ function EventCard({ index, onOpenTickets, restaurant }) {
   );
 }
 
-function BottomNavigation() {
-  const [activeTab, setActiveTab] = React.useState('home');
-  const tabs = [
-    { icon: '🏠', id: 'home', label: 'Home' },
-    { icon: '🔍', id: 'explore', label: 'Explore' },
-    { icon: '🧾', id: 'orders', label: 'Orders' },
-    { icon: '👤', id: 'profile', label: 'Profile' },
-  ];
-
-  return (
-    <View style={styles.bottomNavWrap}>
-      <View style={styles.bottomNav}>
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTab;
-          return (
-            <Pressable
-              key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              style={({ pressed }) => [
-                styles.bottomNavItem,
-                isActive ? styles.bottomNavItemActive : null,
-                pressed ? styles.scalePressed : null,
-              ]}
-            >
-              <Text style={styles.bottomNavIcon}>{tab.icon}</Text>
-              <Text style={[styles.bottomNavLabel, isActive ? styles.bottomNavLabelActive : null]}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
 export function MarketplaceBrowseScreen({
-  featuredRestaurants,
   filteredRestaurants,
-  loading,
+  locationLabel,
+  nearbyError,
+  nearbyLoading,
+  nearbyRestaurants,
+  onOpenAuth,
   onOpenRestaurant,
   onOpenTickets,
   onSelectCategory,
@@ -256,14 +261,13 @@ export function MarketplaceBrowseScreen({
   searchQuery,
   selectedCategory,
 }) {
+  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+  const [activeDrawerTab, setActiveDrawerTab] = React.useState('home');
+  const [headerElevated, setHeaderElevated] = React.useState(false);
   const topPicks = React.useMemo(() => {
-    const featured = Array.isArray(featuredRestaurants) ? featuredRestaurants : [];
-    if (featured.length) {
-      return featured.slice(0, 8);
-    }
-    const fallback = Array.isArray(filteredRestaurants) ? filteredRestaurants : [];
-    return fallback.slice(0, 8);
-  }, [featuredRestaurants, filteredRestaurants]);
+    const nearbyList = Array.isArray(nearbyRestaurants) ? nearbyRestaurants : [];
+    return nearbyList.slice(0, 8);
+  }, [nearbyRestaurants]);
 
   const nearbyEvents = React.useMemo(() => {
     const list = Array.isArray(filteredRestaurants) ? filteredRestaurants : [];
@@ -282,6 +286,37 @@ export function MarketplaceBrowseScreen({
     }
     return topPicks.slice(0, 6);
   }, [filteredRestaurants, topPicks]);
+
+  const normalizedLocationLabel = React.useMemo(
+    () => String(locationLabel || 'Locating...').trim().toUpperCase(),
+    [locationLabel],
+  );
+  const nearbyStateError = String(nearbyError || '').trim();
+  const drawerTabs = React.useMemo(
+    () => [
+      { id: 'home', label: 'Home' },
+      { id: 'explore', label: 'Explore' },
+      { id: 'orders', label: 'Orders' },
+      { id: 'profile', label: 'Profile' },
+    ],
+    [],
+  );
+
+  const handleSelectDrawerTab = React.useCallback((tabId) => {
+    setActiveDrawerTab(tabId);
+    setIsDrawerOpen(false);
+  }, []);
+
+  const handleOpenAuthFromDrawer = React.useCallback((action) => {
+    setIsDrawerOpen(false);
+    onOpenAuth?.(action);
+  }, [onOpenAuth]);
+
+  const handleScroll = React.useCallback((event) => {
+    const offsetY = Number(event?.nativeEvent?.contentOffset?.y || 0);
+    const shouldElevate = offsetY > 8;
+    setHeaderElevated((previous) => (previous === shouldElevate ? previous : shouldElevate));
+  }, []);
 
   return (
     <View style={styles.screen}>
@@ -303,32 +338,42 @@ export function MarketplaceBrowseScreen({
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
       >
-        <View style={styles.topHeader}>
-          <Pressable style={({ pressed }) => [styles.locationButton, pressed ? styles.scalePressed : null]}>
-            <Text style={styles.locationButtonText}>📍 Izmir</Text>
-          </Pressable>
-          <Image resizeMode="contain" source={BEYALL_LOGO} style={styles.logo} />
-          <View style={styles.headerIconsWrap}>
-            <HeaderIconButton icon="🔔" />
-            <HeaderIconButton badgeCount={2} icon="🛒" />
+        <View style={[styles.stickyHeaderWrap, headerElevated ? styles.stickyHeaderElevated : null]}>
+          <View style={styles.topHeader}>
+            <HeaderMenuButton onPress={() => setIsDrawerOpen(true)} />
+            <View style={styles.headerSearchSlot}>
+              <View style={[styles.searchContainer, styles.searchContainerInHeader]}>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                  onChangeText={onSetSearchQuery}
+                  placeholder="Search restaurants, events..."
+                  placeholderTextColor="#8b95a1"
+                  returnKeyType="search"
+                  style={[styles.searchInput, styles.searchInputInHeader]}
+                  value={searchQuery}
+                />
+              </View>
+            </View>
+            <View style={styles.headerRightControls}>
+              <Pressable style={({ pressed }) => [styles.locationButton, pressed ? styles.scalePressed : null]}>
+                <View style={styles.locationIconWrap}>
+                  <View style={styles.locationGlyph} />
+                  <View style={styles.locationGlyphStem} />
+                </View>
+                <Text numberOfLines={1} style={styles.locationButtonText}>
+                  {normalizedLocationLabel}
+                </Text>
+              </Pressable>
+              <HeaderAlertButton badgeCount={2} onPress={() => {}} />
+            </View>
           </View>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <TextInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            onChangeText={onSetSearchQuery}
-            placeholder="Search for restaurants, events..."
-            placeholderTextColor="#8b95a1"
-            returnKeyType="search"
-            style={styles.searchInput}
-            value={searchQuery}
-          />
-          <Text style={styles.searchSparkle}>✨</Text>
         </View>
 
         <View style={styles.heroWrap}>
@@ -353,7 +398,9 @@ export function MarketplaceBrowseScreen({
               </Pressable>
             </View>
             <View style={styles.heroVisual}>
-              <Text style={styles.heroEmojiLarge}>🍔</Text>
+              <View style={styles.heroChip}>
+                <Text style={styles.heroChipText}>MARKET</Text>
+              </View>
               <View style={styles.discountBadge}>
                 <Text style={styles.discountBadgeText}>% OFF</Text>
               </View>
@@ -382,12 +429,19 @@ export function MarketplaceBrowseScreen({
         </ScrollView>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Top Picks</Text>
+          <Text style={styles.sectionTitle}>Nearby Restaurants</Text>
         </View>
-        {loading ? (
+        {nearbyLoading ? (
+          <NearbySkeletonRow />
+        ) : nearbyStateError ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator color="#5B2EFF" />
-            <Text style={styles.loadingText}>Loading popular places...</Text>
+            <Text style={styles.loadingText}>Unable to detect nearby restaurants.</Text>
+            <Text style={styles.loadingSubText}>{nearbyStateError}</Text>
+          </View>
+        ) : topPicks.length === 0 ? (
+          <View style={styles.loadingState}>
+            <Text style={styles.loadingText}>No restaurants near you</Text>
+            <Text style={styles.loadingSubText}>Try changing category or search radius.</Text>
           </View>
         ) : (
           <ScrollView
@@ -422,8 +476,72 @@ export function MarketplaceBrowseScreen({
             />
           ))}
         </ScrollView>
+
+        <View style={styles.bottomLogoWrap}>
+          <Image resizeMode="contain" source={BEYALL_LOGO} style={styles.bottomPageLogo} />
+        </View>
       </ScrollView>
-      <BottomNavigation />
+
+      <View pointerEvents={isDrawerOpen ? 'auto' : 'none'} style={styles.drawerRoot}>
+        <Pressable
+          onPress={() => setIsDrawerOpen(false)}
+          style={[styles.drawerBackdrop, !isDrawerOpen ? styles.drawerBackdropHidden : null]}
+        />
+        <View style={[styles.drawerPanel, !isDrawerOpen ? styles.drawerPanelClosed : null]}>
+          <View style={styles.drawerHeader}>
+            <Image resizeMode="contain" source={BEYALL_LOGO} style={styles.drawerLogo} />
+            <Text style={styles.drawerTitle}>Navigation</Text>
+          </View>
+          <View style={styles.drawerLocationBadge}>
+            <Text numberOfLines={1} style={styles.drawerLocationText}>
+              {normalizedLocationLabel}
+            </Text>
+          </View>
+          <View style={styles.drawerTabList}>
+            {drawerTabs.map((tab) => {
+              const isActive = activeDrawerTab === tab.id;
+              return (
+                <Pressable
+                  key={tab.id}
+                  onPress={() => handleSelectDrawerTab(tab.id)}
+                  style={({ pressed }) => [
+                    styles.drawerTabButton,
+                    isActive ? styles.drawerTabButtonActive : null,
+                    pressed ? styles.scalePressed : null,
+                  ]}
+                >
+                  <View style={[styles.drawerTabDot, isActive ? styles.drawerTabDotActive : null]} />
+                  <Text style={[styles.drawerTabLabel, isActive ? styles.drawerTabLabelActive : null]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.drawerAuthActions}>
+            <Pressable
+              onPress={() => handleOpenAuthFromDrawer('login')}
+              style={({ pressed }) => [
+                styles.drawerAuthButton,
+                styles.drawerAuthButtonGhost,
+                pressed ? styles.scalePressed : null,
+              ]}
+            >
+              <Text style={styles.drawerAuthButtonGhostText}>Log in</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleOpenAuthFromDrawer('register')}
+              style={({ pressed }) => [
+                styles.drawerAuthButton,
+                styles.drawerAuthButtonPrimary,
+                pressed ? styles.scalePressed : null,
+              ]}
+            >
+              <Text style={styles.drawerAuthButtonPrimaryText}>Sign up</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -450,62 +568,149 @@ const styles = StyleSheet.create({
   content: {
     gap: 18,
     paddingHorizontal: 16,
-    paddingBottom: 116,
-    paddingTop: 12,
+    paddingBottom: 28,
+    paddingTop: 0,
+  },
+  stickyHeaderWrap: {
+    backgroundColor: 'rgba(255,255,255,0)',
+    borderBottomColor: 'transparent',
+    borderBottomWidth: 1,
+    marginHorizontal: -16,
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  stickyHeaderElevated: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderBottomColor: '#ebeff7',
   },
   topHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 42,
+    minHeight: 36,
+    position: 'relative',
+  },
+  headerSearchSlot: {
+    flex: 1,
+    marginLeft: 10,
+    marginRight: 6,
+    maxWidth: 170,
+  },
+  headerRightControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   locationButton: {
-    backgroundColor: '#f4f6fb',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    height: 32,
+    justifyContent: 'center',
+    maxHeight: 32,
+    maxWidth: 82,
+    minWidth: 72,
+    paddingHorizontal: 2,
+  },
+  locationIconWrap: {
+    alignItems: 'center',
+    height: 11,
+    justifyContent: 'flex-start',
+    width: 8,
+  },
+  locationGlyph: {
+    borderColor: '#334155',
     borderRadius: 999,
-    minWidth: 88,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderWidth: 1.6,
+    height: 8,
+    width: 8,
+  },
+  locationGlyphStem: {
+    backgroundColor: '#334155',
+    borderRadius: 999,
+    height: 3,
+    marginTop: 1,
+    width: 1.8,
   },
   locationButtonText: {
     color: '#283241',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
-  logo: {
-    height: 38,
-    width: 102,
-  },
-  headerIconsWrap: {
-    flexDirection: 'row',
-    gap: 8,
+  drawerTriggerButton: {
+    alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
+    width: 18,
   },
   headerIconButton: {
     alignItems: 'center',
-    backgroundColor: '#f4f6fb',
-    borderRadius: 999,
-    height: 34,
+    backgroundColor: '#f1f5fb',
+    borderColor: '#dce4f2',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 32,
     justifyContent: 'center',
     position: 'relative',
-    width: 34,
+    width: 32,
   },
-  headerIconText: {
-    fontSize: 16,
+  menuGlyphWrap: {
+    gap: 3,
+    width: 14,
+  },
+  menuGlyphLine: {
+    backgroundColor: '#334155',
+    borderRadius: 999,
+    height: 1.8,
+    width: '100%',
+  },
+  menuGlyphLineMid: {
+    width: '72%',
+  },
+  alertGlyphWrap: {
+    alignItems: 'center',
+    height: 16,
+    justifyContent: 'flex-end',
+    width: 14,
+  },
+  alertGlyphTop: {
+    backgroundColor: '#334155',
+    borderRadius: 999,
+    height: 2,
+    marginBottom: 1,
+    width: 5,
+  },
+  alertGlyphBody: {
+    borderColor: '#334155',
+    borderRadius: 6,
+    borderWidth: 1.6,
+    height: 10,
+    width: 10,
+  },
+  alertGlyphDot: {
+    backgroundColor: '#334155',
+    borderRadius: 999,
+    height: 2.8,
+    marginTop: 1.5,
+    width: 2.8,
   },
   iconBadge: {
     alignItems: 'center',
-    backgroundColor: '#f43f5e',
+    backgroundColor: '#5B2EFF',
     borderRadius: 999,
-    height: 16,
+    height: 17,
     justifyContent: 'center',
-    minWidth: 16,
+    minWidth: 17,
     position: 'absolute',
-    right: -3,
-    top: -3,
+    right: -4,
+    top: -4,
   },
   iconBadgeText: {
     color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 9,
+    fontWeight: '800',
   },
   searchContainer: {
     alignItems: 'center',
@@ -525,6 +730,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 1,
   },
+  searchContainerInHeader: {
+    borderColor: '#e6ebf5',
+    borderRadius: 11,
+    minHeight: 32,
+    paddingHorizontal: 9,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
   searchInput: {
     color: '#111827',
     flex: 1,
@@ -532,8 +746,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     minHeight: 48,
   },
-  searchSparkle: {
-    fontSize: 18,
+  searchInputInHeader: {
+    fontSize: 12,
+    minHeight: 30,
+  },
+  bottomLogoWrap: {
+    alignItems: 'center',
+    marginTop: 8,
+    paddingBottom: 8,
+  },
+  bottomPageLogo: {
+    height: 26,
+    width: 128,
   },
   heroWrap: {
     gap: 11,
@@ -581,8 +805,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minWidth: 78,
   },
-  heroEmojiLarge: {
-    fontSize: 44,
+  heroChip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(17,24,39,0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  heroChipText: {
+    color: '#1f2937',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
   },
   discountBadge: {
     alignItems: 'center',
@@ -626,20 +860,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   categoryPillActive: {
     borderWidth: 0,
   },
-  categoryIcon: {
-    fontSize: 14,
-  },
   categoryLabel: {
     color: '#334155',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   categoryLabelActive: {
     color: '#ffffff',
@@ -684,6 +916,23 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     width: 216,
     elevation: 2,
+  },
+  skeletonBlock: {
+    backgroundColor: '#edf1f8',
+  },
+  skeletonLine: {
+    backgroundColor: '#edf1f8',
+    borderRadius: 999,
+    height: 10,
+  },
+  skeletonLinePrimary: {
+    width: '74%',
+  },
+  skeletonLineSecondary: {
+    width: '48%',
+  },
+  skeletonLineTertiary: {
+    width: '35%',
   },
   topPickImage: {
     height: 132,
@@ -791,43 +1040,134 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  bottomNavWrap: {
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    borderTopColor: '#ebeff7',
-    borderTopWidth: 1,
+  drawerRoot: {
     bottom: 0,
     left: 0,
     position: 'absolute',
     right: 0,
+    top: 0,
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: 12,
+  drawerBackdrop: {
+    backgroundColor: 'rgba(2, 8, 23, 0.26)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
-  bottomNavItem: {
+  drawerBackdropHidden: {
+    opacity: 0,
+  },
+  drawerPanel: {
+    backgroundColor: '#ffffff',
+    borderBottomRightRadius: 24,
+    borderTopRightRadius: 24,
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: 18,
+    paddingTop: 56,
+    position: 'absolute',
+    shadowColor: '#0f172a',
+    shadowOffset: {
+      width: 6,
+      height: 0,
+    },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    top: 0,
+    width: 268,
+    elevation: 16,
+  },
+  drawerPanelClosed: {
+    transform: [{ translateX: -288 }],
+  },
+  drawerHeader: {
+    gap: 3,
+  },
+  drawerLogo: {
+    height: 24,
+    width: 96,
+  },
+  drawerTitle: {
+    color: '#0f172a',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  drawerLocationBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#f1f5fb',
+    borderRadius: 999,
+    marginTop: 14,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  drawerLocationText: {
+    color: '#334155',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
+  drawerTabList: {
+    gap: 10,
+    marginTop: 24,
+  },
+  drawerAuthActions: {
+    gap: 10,
+    marginTop: 26,
+  },
+  drawerAuthButton: {
     alignItems: 'center',
     borderRadius: 12,
-    flex: 1,
-    gap: 3,
-    minHeight: 50,
+    minHeight: 42,
     justifyContent: 'center',
+    paddingHorizontal: 14,
   },
-  bottomNavItemActive: {
-    backgroundColor: '#f1ecff',
+  drawerAuthButtonGhost: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
   },
-  bottomNavIcon: {
-    fontSize: 18,
+  drawerAuthButtonPrimary: {
+    backgroundColor: '#5B2EFF',
   },
-  bottomNavLabel: {
-    color: '#667085',
-    fontSize: 11,
+  drawerAuthButtonGhostText: {
+    color: '#1f2937',
+    fontSize: 14,
     fontWeight: '700',
   },
-  bottomNavLabelActive: {
-    color: '#5B2EFF',
+  drawerAuthButtonPrimaryText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  drawerTabButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  drawerTabButtonActive: {
+    backgroundColor: '#eef2ff',
+  },
+  drawerTabDot: {
+    backgroundColor: '#c9d2e3',
+    borderRadius: 999,
+    height: 7,
+    width: 7,
+  },
+  drawerTabDotActive: {
+    backgroundColor: '#5B2EFF',
+  },
+  drawerTabLabel: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  drawerTabLabelActive: {
+    color: '#4c1d95',
   },
   scalePressed: {
     opacity: 0.92,
@@ -845,5 +1185,12 @@ const styles = StyleSheet.create({
     color: '#667085',
     fontSize: 13,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  loadingSubText: {
+    color: '#8a93a1',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

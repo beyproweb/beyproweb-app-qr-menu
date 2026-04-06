@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { getRecentRestaurantSlugs } from '../../storage/sessionStore';
 import { fetchMarketplaceRestaurants } from '../services/marketplaceCatalogService';
+import { reverseGeocodeCity } from '../services/locationService';
 import {
   getFavoriteRestaurantSlugs,
   setFavoriteRestaurantSlugs,
 } from '../services/marketplaceStorageService';
 import { filterRestaurants, mapRestaurantsBySlug } from '../utils/restaurantFilters';
+import { useCurrentLocation } from './useCurrentLocation';
+import { useNearbyRestaurants } from './useNearbyRestaurants';
 
 const MARKETPLACE_CATEGORIES = [
   { id: 'all', label: 'All' },
@@ -30,6 +33,36 @@ function sortByDistanceAscending(restaurants) {
   });
 }
 
+function extractCityFromLocationText(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  const slashParts = text.split('/').map((item) => item.trim()).filter(Boolean);
+  if (slashParts.length > 1) {
+    return slashParts[slashParts.length - 1];
+  }
+
+  const commaParts = text.split(',').map((item) => item.trim()).filter(Boolean);
+  if (commaParts.length > 1) {
+    return commaParts[commaParts.length - 1];
+  }
+
+  return text;
+}
+
+function resolveNearestRestaurantCity(restaurants) {
+  const sorted = sortByDistanceAscending(Array.isArray(restaurants) ? restaurants : []);
+  for (const restaurant of sorted) {
+    const city = extractCityFromLocationText(restaurant?.location);
+    if (city) {
+      return city;
+    }
+  }
+  return '';
+}
+
 export function useMarketplaceData() {
   const [restaurants, setRestaurants] = useState([]);
   const [favoriteSlugs, setFavoriteSlugs] = useState([]);
@@ -37,6 +70,8 @@ export function useMarketplaceData() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [detectedCity, setDetectedCity] = useState('');
+  const location = useCurrentLocation();
 
   const refreshPersistedLists = useCallback(async () => {
     const [favorites, recents] = await Promise.all([
@@ -90,15 +125,81 @@ export function useMarketplaceData() {
     [favoriteSlugs, filteredBySlug],
   );
 
-  const featuredRestaurants = useMemo(
-    () => filteredRestaurants.filter((restaurant) => restaurant.is_featured),
-    [filteredRestaurants],
+  const nearbyFeed = useNearbyRestaurants({
+    enabled: !location.loading && !location.error,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    radiusKm: 5,
+  });
+
+  const nearbyRestaurantsByLocation = useMemo(
+    () => sortByDistanceAscending(nearbyFeed.restaurants || []),
+    [nearbyFeed.restaurants],
   );
 
-  const nearbyRestaurants = useMemo(
-    () => sortByDistanceAscending(filteredRestaurants).slice(0, 8),
-    [filteredRestaurants],
+  const nearbyFilteredRestaurants = useMemo(
+    () =>
+      filterRestaurants(
+        nearbyRestaurantsByLocation,
+        searchQuery,
+        selectedCategory,
+      ).slice(0, 8),
+    [nearbyRestaurantsByLocation, searchQuery, selectedCategory],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveDetectedCity() {
+      if (!Number.isFinite(Number(location.latitude)) || !Number.isFinite(Number(location.longitude))) {
+        setDetectedCity('');
+        return;
+      }
+
+      const city = await reverseGeocodeCity({
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+
+      if (!cancelled) {
+        setDetectedCity(city || '');
+      }
+    }
+
+    resolveDetectedCity();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.latitude, location.longitude]);
+
+  const fallbackCity = useMemo(() => {
+    const fromNearby = resolveNearestRestaurantCity(nearbyRestaurantsByLocation);
+    if (fromNearby) {
+      return fromNearby;
+    }
+    return resolveNearestRestaurantCity(filteredRestaurants);
+  }, [nearbyRestaurantsByLocation, filteredRestaurants]);
+
+  const locationLabel = useMemo(() => {
+    if (detectedCity) {
+      return detectedCity;
+    }
+    if (fallbackCity) {
+      return fallbackCity;
+    }
+    if (location.loading) {
+      return 'Locating...';
+    }
+    if (location.error) {
+      return 'Location off';
+    }
+    return 'Near you';
+  }, [detectedCity, fallbackCity, location.error, location.loading]);
+
+  const nearbyLoading =
+    location.loading || (!location.error && nearbyFeed.loading);
+  const nearbyError = location.error || nearbyFeed.error || null;
 
   const toggleFavorite = useCallback(async (slug) => {
     if (!slug) {
@@ -123,11 +224,13 @@ export function useMarketplaceData() {
     categories: MARKETPLACE_CATEGORIES,
     favoriteRestaurants,
     favoriteSlugs,
-    featuredRestaurants,
     findRestaurantBySlug,
     filteredRestaurants,
+    locationLabel,
     loading,
-    nearbyRestaurants,
+    nearbyError,
+    nearbyLoading,
+    nearbyRestaurants: nearbyFilteredRestaurants,
     recentRestaurants,
     refreshPersistedLists,
     searchQuery,

@@ -5,6 +5,8 @@ const DEFAULT_APP_LINK_BASE_URL = 'https://app.beypro.com';
 const DEFAULT_DEEP_LINK_SCHEME = 'beypro';
 const DEFAULT_WEB_ENTRY_PATH = '/menu';
 const DEFAULT_MARKETPLACE_API_URL = 'https://hurrypos-backend.onrender.com/api/public/marketplace/restaurants';
+const DEFAULT_NEARBY_RESTAURANTS_API_URL =
+  'https://hurrypos-backend.onrender.com/api/public/restaurants/nearby';
 
 const rawWebBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
 const rawAppLinkBaseUrl = process.env.EXPO_PUBLIC_APP_LINK_BASE_URL;
@@ -13,6 +15,7 @@ const rawExtraInternalHosts = process.env.EXPO_PUBLIC_INTERNAL_HOSTS;
 const rawWebEntryPath = process.env.EXPO_PUBLIC_WEB_ENTRY_PATH;
 const rawDefaultRestaurantSlug = process.env.EXPO_PUBLIC_DEFAULT_RESTAURANT_SLUG;
 const rawMarketplaceApiUrl = process.env.EXPO_PUBLIC_MARKETPLACE_API_URL;
+const rawNearbyRestaurantsApiUrl = process.env.EXPO_PUBLIC_NEARBY_RESTAURANTS_API_URL;
 
 function readHostFromBaseUrl(baseUrl) {
   const parsed = safeParseUrl(baseUrl);
@@ -24,6 +27,10 @@ export const APP_LINK_BASE_URL = normalizeBaseUrl(rawAppLinkBaseUrl, DEFAULT_APP
 export const MARKETPLACE_API_URL = normalizeBaseUrl(
   rawMarketplaceApiUrl,
   DEFAULT_MARKETPLACE_API_URL,
+);
+export const NEARBY_RESTAURANTS_API_URL = normalizeBaseUrl(
+  rawNearbyRestaurantsApiUrl,
+  DEFAULT_NEARBY_RESTAURANTS_API_URL,
 );
 export const DEEP_LINK_SCHEME = rawDeepLinkScheme || DEFAULT_DEEP_LINK_SCHEME;
 export const INTERNAL_ROOT_DOMAIN = 'beypro.com';
