@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { UI_TEXT } from '../config/constants';
 import { useAppLinks } from '../linking/useAppLinks';
+import { useMarketplaceAuth } from '../marketplace/hooks/useMarketplaceAuth';
 import { MarketplaceNavigator } from '../marketplace/screens/MarketplaceNavigator';
 import { ErrorState } from '../ui/ErrorState';
 import { LoadingState } from '../ui/LoadingState';
@@ -31,6 +32,7 @@ export function CustomerMobileApp() {
     targetWebUrl,
     trackInternalWebNavigation,
   } = useAppLinks();
+  const marketplaceAuth = useMarketplaceAuth();
 
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasLoadedInitialPage, setHasLoadedInitialPage] = useState(false);
@@ -201,6 +203,7 @@ export function CustomerMobileApp() {
           ]}
         >
           <MarketplaceNavigator
+            authState={marketplaceAuth}
             onOpenAuthFlow={openAuthRoute}
             onOpenRestaurantFlow={openRestaurantRoute}
           />
@@ -236,6 +239,7 @@ export function CustomerMobileApp() {
           onPageLoadEnd={handleLoadEnd}
           onPageLoadStart={handleLoadStart}
           onTrackInternalUrl={trackInternalWebNavigation}
+          marketplaceSession={marketplaceAuth.webSyncPayload}
           sourceUrl={targetWebUrl}
           webViewRef={webViewRef}
         />

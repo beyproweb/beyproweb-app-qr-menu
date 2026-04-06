@@ -16,6 +16,7 @@ const COLORS = {
   accentEnd: '#7C3AED',
   accentStart: '#5B2EFF',
   border: '#d6d7e3',
+  danger: '#b42318',
   darkText: '#1A1A1A',
   lightText: '#5d6371',
   surface: '#FFFFFF',
@@ -24,14 +25,16 @@ const COLORS = {
 
 const BRAND_LOGO = require('../../../assets/Vibrant _beyall_ logo design.png');
 
-function SocialButton({ dark, label, onPress }) {
+function SocialButton({ dark, disabled, label, onPress }) {
   return (
     <Pressable
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.socialButton,
         dark ? styles.appleButton : styles.googleButton,
-        pressed && styles.socialButtonPressed,
+        disabled ? styles.disabledButton : null,
+        pressed && !disabled ? styles.socialButtonPressed : null,
       ]}
     >
       <Text style={[styles.socialButtonText, dark ? styles.appleButtonText : styles.googleButtonText]}>
@@ -41,34 +44,45 @@ function SocialButton({ dark, label, onPress }) {
   );
 }
 
-function PhoneNumberField({ onChangeText, onSubmitEditing, value }) {
+function AuthField({
+  autoCapitalize = 'none',
+  autoCorrect = false,
+  keyboardType = 'default',
+  onChangeText,
+  placeholder,
+  secureTextEntry = false,
+  value,
+}) {
   return (
-    <View style={styles.phoneFieldWrap}>
-      <View style={styles.countryCodePill}>
-        <Text style={styles.countryCodeText}>+90</Text>
-      </View>
-      <TextInput
-        keyboardType="phone-pad"
-        onChangeText={onChangeText}
-        onSubmitEditing={onSubmitEditing}
-        placeholder="Phone number"
-        placeholderTextColor="#8f95a2"
-        returnKeyType="done"
-        selectionColor={COLORS.accentStart}
-        style={styles.phoneInput}
-        value={value}
-      />
-    </View>
+    <TextInput
+      autoCapitalize={autoCapitalize}
+      autoCorrect={autoCorrect}
+      keyboardType={keyboardType}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="#8f95a2"
+      secureTextEntry={secureTextEntry}
+      selectionColor={COLORS.accentStart}
+      style={styles.authInput}
+      value={value}
+    />
   );
 }
 
 export function MarketplaceHomeScreen({
-  phoneInput,
-  onChangePhoneInput,
+  authError,
+  authLoading,
+  authMode,
+  formValues,
+  onCancelAuth,
+  onChangeField,
   onContinueWithApple,
   onContinueWithGoogle,
-  onContinueWithPhone,
+  onSubmitAuth,
+  onSwitchAuthMode,
 }) {
+  const isRegister = authMode === 'register';
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -102,29 +116,118 @@ export function MarketplaceHomeScreen({
 
           <View style={styles.headerWrap}>
             <Text style={styles.title}>Welcome to Beyall</Text>
-            <Text style={styles.subtitle}>Order food, reserve tables, buy tickets and more</Text>
+            <Text style={styles.subtitle}>One account across all restaurants</Text>
+          </View>
+
+          <View style={styles.authModeRow}>
+            <Pressable
+              onPress={() => onSwitchAuthMode?.('login')}
+              style={[styles.authModeButton, !isRegister ? styles.authModeButtonActive : null]}
+            >
+              <Text style={[styles.authModeText, !isRegister ? styles.authModeTextActive : null]}>Log in</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onSwitchAuthMode?.('register')}
+              style={[styles.authModeButton, isRegister ? styles.authModeButtonActive : null]}
+            >
+              <Text style={[styles.authModeText, isRegister ? styles.authModeTextActive : null]}>Sign up</Text>
+            </Pressable>
           </View>
 
           <View style={styles.authCard}>
             <SocialButton
               dark
+              disabled={authLoading}
               label="Continue with Apple"
               onPress={() => onContinueWithApple?.()}
             />
             <SocialButton
+              disabled={authLoading}
               label="Continue with Google"
               onPress={() => onContinueWithGoogle?.()}
             />
-            <PhoneNumberField
-              onChangeText={onChangePhoneInput}
-              onSubmitEditing={() => onContinueWithPhone?.()}
-              value={phoneInput}
+
+            {isRegister ? (
+              <AuthField
+                autoCapitalize="words"
+                onChangeText={(value) => onChangeField?.('name', value)}
+                placeholder="Full name"
+                value={formValues?.name}
+              />
+            ) : null}
+
+            <AuthField
+              keyboardType={isRegister ? 'phone-pad' : 'default'}
+              onChangeText={(value) => onChangeField?.(isRegister ? 'phone' : 'login', value)}
+              placeholder={isRegister ? 'Phone number' : 'Phone or email'}
+              value={isRegister ? formValues?.phone : formValues?.login}
             />
+
+            {isRegister ? (
+              <AuthField
+                keyboardType="email-address"
+                onChangeText={(value) => onChangeField?.('email', value)}
+                placeholder="Email (optional)"
+                value={formValues?.email}
+              />
+            ) : null}
+
+            {isRegister ? (
+              <AuthField
+                autoCapitalize="words"
+                onChangeText={(value) => onChangeField?.('address', value)}
+                placeholder="Address (optional)"
+                value={formValues?.address}
+              />
+            ) : null}
+
+            <AuthField
+              onChangeText={(value) => onChangeField?.('password', value)}
+              placeholder="Password"
+              secureTextEntry
+              value={formValues?.password}
+            />
+
+            {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
+
+            <Pressable
+              disabled={authLoading}
+              onPress={() => onSubmitAuth?.()}
+              style={({ pressed }) => [
+                styles.primaryAction,
+                authLoading ? styles.disabledButton : null,
+                pressed && !authLoading ? styles.socialButtonPressed : null,
+              ]}
+            >
+              <LinearGradient
+                colors={[COLORS.accentStart, COLORS.accentEnd]}
+                end={{ x: 1, y: 0.5 }}
+                start={{ x: 0, y: 0.5 }}
+                style={styles.primaryActionGradient}
+              >
+                <Text style={styles.primaryActionText}>
+                  {authLoading ? 'Please wait...' : isRegister ? 'Create account' : 'Continue'}
+                </Text>
+              </LinearGradient>
+            </Pressable>
           </View>
 
           <View style={styles.footerWrap}>
-            <Text style={styles.footerText}>Terms & Privacy</Text>
-            <Text style={styles.footerSupport}>Need help? Get support</Text>
+            <Text style={styles.footerText}>Your account works in every Beyall restaurant</Text>
+            <Text style={styles.footerSupport}>No repeated sign-in needed</Text>
+            {typeof onCancelAuth === 'function' ? (
+              <Pressable
+                disabled={authLoading}
+                onPress={onCancelAuth}
+                style={({ pressed }) => [
+                  styles.secondaryAction,
+                  authLoading ? styles.disabledButton : null,
+                  pressed && !authLoading ? styles.socialButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.secondaryActionText}>Back to marketplace</Text>
+              </Pressable>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -163,7 +266,7 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: 24,
     marginTop: 6,
   },
   logo: {
@@ -172,7 +275,7 @@ const styles = StyleSheet.create({
   },
   headerWrap: {
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: 18,
     paddingHorizontal: 8,
   },
   title: {
@@ -190,6 +293,31 @@ const styles = StyleSheet.create({
     marginTop: 9,
     textAlign: 'center',
   },
+  authModeRow: {
+    backgroundColor: '#eceef8',
+    borderRadius: 14,
+    flexDirection: 'row',
+    marginBottom: 12,
+    padding: 4,
+  },
+  authModeButton: {
+    alignItems: 'center',
+    borderRadius: 10,
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  authModeButtonActive: {
+    backgroundColor: '#ffffff',
+  },
+  authModeText: {
+    color: '#667085',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  authModeTextActive: {
+    color: COLORS.darkText,
+  },
   authCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 20,
@@ -202,7 +330,7 @@ const styles = StyleSheet.create({
   socialButton: {
     alignItems: 'center',
     borderRadius: 14,
-    minHeight: 52,
+    minHeight: 50,
     justifyContent: 'center',
     marginBottom: 10,
     paddingHorizontal: 14,
@@ -219,7 +347,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   socialButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   appleButtonText: {
@@ -228,41 +356,45 @@ const styles = StyleSheet.create({
   googleButtonText: {
     color: COLORS.darkText,
   },
-  phoneFieldWrap: {
-    alignItems: 'center',
+  authInput: {
     borderColor: COLORS.border,
     borderRadius: 14,
     borderWidth: 1,
-    flexDirection: 'row',
-    minHeight: 54,
-    paddingHorizontal: 8,
-  },
-  countryCodePill: {
-    alignItems: 'center',
-    backgroundColor: '#efeff6',
-    borderRadius: 10,
-    minWidth: 56,
-    justifyContent: 'center',
-    marginRight: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  countryCodeText: {
     color: COLORS.darkText,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 10,
+    minHeight: 50,
+    paddingHorizontal: 12,
+  },
+  errorText: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  primaryAction: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  primaryActionGradient: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  primaryActionText: {
+    color: '#ffffff',
+    fontSize: 15,
     fontWeight: '700',
   },
-  phoneInput: {
-    color: COLORS.darkText,
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    minHeight: 52,
+  disabledButton: {
+    opacity: 0.65,
   },
   footerWrap: {
     alignItems: 'center',
     marginTop: 'auto',
-    paddingTop: 26,
+    paddingTop: 22,
   },
   footerText: {
     color: '#7d8391',
@@ -276,5 +408,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 10,
     textAlign: 'center',
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 14,
+    minHeight: 40,
+    paddingHorizontal: 18,
+  },
+  secondaryActionText: {
+    color: COLORS.darkText,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.15,
   },
 });

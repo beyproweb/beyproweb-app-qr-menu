@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Linking } from 'react-native';
 
 import * as WebBrowser from 'expo-web-browser';
@@ -52,6 +52,7 @@ export function CustomerWebAppContainer({
   onPageLoadEnd,
   onPageLoadStart,
   onTrackInternalUrl,
+  marketplaceSession,
   sourceUrl,
   webViewRef,
 }) {
@@ -88,6 +89,44 @@ export function CustomerWebAppContainer({
     [onMarketplaceRequest],
   );
 
+  const injectedMarketplaceSessionScript = useMemo(() => {
+    const token = String(marketplaceSession?.token || '');
+    const customer = marketplaceSession?.customer || null;
+
+    return `(() => {
+      try {
+        var token = ${JSON.stringify(token)};
+        var customer = ${JSON.stringify(customer)};
+        var session = customer ? {
+          id: customer.id,
+          username: customer.name || 'Customer',
+          name: customer.name || 'Customer',
+          phone: customer.phone || '',
+          email: customer.email || '',
+          address: customer.address || '',
+          language: customer.language || ''
+        } : null;
+
+        if (token) {
+          window.localStorage.setItem('qr_customer_token', token);
+        } else {
+          window.localStorage.removeItem('qr_customer_token');
+        }
+
+        if (session) {
+          window.localStorage.setItem('qr_customer_session', JSON.stringify(session));
+        } else {
+          window.localStorage.removeItem('qr_customer_session');
+        }
+
+        window.dispatchEvent(new CustomEvent('qr:customer-session-changed', {
+          detail: { customer: session || null }
+        }));
+      } catch (_) {}
+    })();
+    true;`;
+  }, [marketplaceSession]);
+
   return (
     <WebView
       allowsFullscreenVideo
@@ -103,6 +142,7 @@ export function CustomerWebAppContainer({
       geolocationEnabled
       javaScriptEnabled
       javaScriptCanOpenWindowsAutomatically
+      injectedJavaScriptBeforeContentLoaded={injectedMarketplaceSessionScript}
       key={`customer-webview-${navigationKey}`}
       mediaPlaybackRequiresUserAction={false}
       mixedContentMode="compatibility"

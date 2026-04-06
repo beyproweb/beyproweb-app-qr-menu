@@ -248,11 +248,14 @@ function EventCard({ index, onOpenTickets, restaurant }) {
 }
 
 export function MarketplaceBrowseScreen({
+  currentCustomer,
   filteredRestaurants,
+  isAuthenticated,
   locationLabel,
   nearbyError,
   nearbyLoading,
   nearbyRestaurants,
+  onLogout,
   onOpenAuth,
   onOpenRestaurant,
   onOpenTickets,
@@ -290,6 +293,10 @@ export function MarketplaceBrowseScreen({
   const normalizedLocationLabel = React.useMemo(
     () => String(locationLabel || 'Locating...').trim().toUpperCase(),
     [locationLabel],
+  );
+  const customerDisplayName = React.useMemo(
+    () => String(currentCustomer?.name || 'Customer').trim(),
+    [currentCustomer?.name],
   );
   const nearbyStateError = String(nearbyError || '').trim();
   const drawerTabs = React.useMemo(
@@ -519,26 +526,51 @@ export function MarketplaceBrowseScreen({
             })}
           </View>
           <View style={styles.drawerAuthActions}>
-            <Pressable
-              onPress={() => handleOpenAuthFromDrawer('login')}
-              style={({ pressed }) => [
-                styles.drawerAuthButton,
-                styles.drawerAuthButtonGhost,
-                pressed ? styles.scalePressed : null,
-              ]}
-            >
-              <Text style={styles.drawerAuthButtonGhostText}>Log in</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleOpenAuthFromDrawer('register')}
-              style={({ pressed }) => [
-                styles.drawerAuthButton,
-                styles.drawerAuthButtonPrimary,
-                pressed ? styles.scalePressed : null,
-              ]}
-            >
-              <Text style={styles.drawerAuthButtonPrimaryText}>Sign up</Text>
-            </Pressable>
+            {isAuthenticated ? (
+              <>
+                <View style={styles.drawerProfileBadge}>
+                  <Text numberOfLines={1} style={styles.drawerProfileText}>
+                    {customerDisplayName}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    setIsDrawerOpen(false);
+                    onLogout?.();
+                  }}
+                  style={({ pressed }) => [
+                    styles.drawerAuthButton,
+                    styles.drawerAuthButtonGhost,
+                    pressed ? styles.scalePressed : null,
+                  ]}
+                >
+                  <Text style={styles.drawerAuthButtonGhostText}>Log out</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => handleOpenAuthFromDrawer('login')}
+                  style={({ pressed }) => [
+                    styles.drawerAuthButton,
+                    styles.drawerAuthButtonGhost,
+                    pressed ? styles.scalePressed : null,
+                  ]}
+                >
+                  <Text style={styles.drawerAuthButtonGhostText}>Log in</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleOpenAuthFromDrawer('register')}
+                  style={({ pressed }) => [
+                    styles.drawerAuthButton,
+                    styles.drawerAuthButtonPrimary,
+                    pressed ? styles.scalePressed : null,
+                  ]}
+                >
+                  <Text style={styles.drawerAuthButtonPrimaryText}>Sign up</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -1115,6 +1147,18 @@ const styles = StyleSheet.create({
   drawerAuthActions: {
     gap: 10,
     marginTop: 26,
+  },
+  drawerProfileBadge: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 10,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  drawerProfileText: {
+    color: '#4338ca',
+    fontSize: 13,
+    fontWeight: '700',
   },
   drawerAuthButton: {
     alignItems: 'center',
