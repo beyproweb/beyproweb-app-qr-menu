@@ -23,6 +23,18 @@ const MARKETPLACE_CATEGORIES = [
   { id: 'pub', label: 'Pub' },
 ];
 
+const DEBUG_NEARBY =
+  (typeof __DEV__ !== 'undefined' && __DEV__) ||
+  (typeof process !== 'undefined' && process?.env?.NODE_ENV !== 'production');
+
+function logNearbyDebug(label, payload = {}) {
+  if (!DEBUG_NEARBY) {
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[nearby][data] ${label}`, payload);
+}
+
 function getRestaurantKey(restaurant) {
   if (!restaurant || typeof restaurant !== 'object') {
     return '';
@@ -67,6 +79,168 @@ function extractCityFromLocationText(value) {
   return text;
 }
 
+function normalizeCityToken(value) {
+  const text = String(value || '').trim().toLocaleLowerCase('tr-TR');
+  if (!text) {
+    return '';
+  }
+  return text
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ş/g, 's')
+    .replace(/ç/g, 'c')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/[^a-z0-9]+/gi, '');
+}
+
+function buildAreaTokenSet(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return new Set();
+  }
+  const tokenSet = new Set();
+  const segments = text.split(/[\/,;|]+/).map((segment) => segment.trim()).filter(Boolean);
+
+  segments.forEach((segment) => {
+    const normalizedSegment = normalizeCityToken(segment);
+    if (normalizedSegment) {
+      tokenSet.add(normalizedSegment);
+    }
+
+    const normalizedWords = String(segment)
+      .toLocaleLowerCase('tr-TR')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ı/g, 'i')
+      .replace(/ğ/g, 'g')
+      .replace(/ş/g, 's')
+      .replace(/ç/g, 'c')
+      .replace(/ö/g, 'o')
+      .replace(/ü/g, 'u')
+      .split(/[^a-z0-9]+/gi)
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 2 && !/^\d+$/.test(word));
+
+    normalizedWords.forEach((word) => tokenSet.add(word));
+  });
+
+  return tokenSet;
+}
+
+function toFiniteCoordinate(value) {
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function haversineDistanceKm(originLat, originLng, targetLat, targetLng) {
+  const lat1 = toFiniteCoordinate(originLat);
+  const lng1 = toFiniteCoordinate(originLng);
+  const lat2 = toFiniteCoordinate(targetLat);
+  const lng2 = toFiniteCoordinate(targetLng);
+  if ([lat1, lng1, lat2, lng2].some((item) => item === null)) {
+    return null;
+  }
+
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const deltaLat = toRadians(lat2 - lat1);
+  const deltaLng = toRadians(lng2 - lng1);
+  const startLatRad = toRadians(lat1);
+  const endLatRad = toRadians(lat2);
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(startLatRad) * Math.cos(endLatRad) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
+function resolveRestaurantDistanceKm(restaurant, userLatitude, userLongitude) {
+  const apiDistanceKm = Number(restaurant?.distance_km);
+  if (Number.isFinite(apiDistanceKm) && apiDistanceKm >= 0) {
+    return apiDistanceKm;
+  }
+
+  return haversineDistanceKm(
+    userLatitude,
+    userLongitude,
+    restaurant?.pos_location_lat,
+    restaurant?.pos_location_lng,
+  );
+}
+
+function getRestaurantDeliveryBlockReason(restaurant, detectedCity, userLatitude, userLongitude) {
+  if (!restaurant || typeof restaurant !== 'object') {
+    return 'invalid_payload';
+  }
+  if (!restaurant.supports_delivery) {
+    return 'delivery_disabled';
+  }
+  const distanceKm = resolveRestaurantDistanceKm(restaurant, userLatitude, userLongitude);
+  if (!Number.isFinite(distanceKm)) {
+    return 'missing_distance_or_coords';
+  }
+  const configuredRangeKm = Number(restaurant?.delivery_range_km);
+  if (Number.isFinite(configuredRangeKm) && configuredRangeKm > 0 && distanceKm > configuredRangeKm) {
+    return 'outside_delivery_range';
+  }
+  if (!isRestaurantAllowedForCity(restaurant, detectedCity)) {
+    return 'outside_delivery_city';
+  }
+  return null;
+}
+
+function isRestaurantAllowedForCity(restaurant, detectedCity) {
+  const userCityToken = normalizeCityToken(detectedCity);
+  if (!userCityToken) {
+    return true;
+  }
+
+  const configuredCities = Array.isArray(restaurant?.delivery_zone_cities)
+    ? restaurant.delivery_zone_cities
+    : [];
+  const configuredTokens = configuredCities
+    .map((city) => normalizeCityToken(city))
+    .filter(Boolean);
+  const configuredTokenSet = new Set(configuredTokens);
+  if (configuredTokenSet.size === 0) {
+    return true;
+  }
+
+  const restaurantAreaTokens = new Set([
+    ...buildAreaTokenSet(restaurant?.location),
+    ...buildAreaTokenSet(restaurant?.city),
+  ]);
+  restaurantAreaTokens.delete('');
+
+  const requestedMatchesConfiguredZone = configuredTokenSet.has(userCityToken);
+  const requestedMatchesRestaurantArea = restaurantAreaTokens.has(userCityToken);
+  const configuredZoneMatchesRestaurantArea = Array.from(configuredTokenSet).some((token) =>
+    restaurantAreaTokens.has(token),
+  );
+
+  return (
+    requestedMatchesConfiguredZone ||
+    (requestedMatchesRestaurantArea && configuredZoneMatchesRestaurantArea)
+  );
+}
+
+function isRestaurantDeliverable(restaurant, detectedCity, userLatitude, userLongitude) {
+  return (
+    getRestaurantDeliveryBlockReason(
+      restaurant,
+      detectedCity,
+      userLatitude,
+      userLongitude,
+    ) === null
+  );
+}
+
 function resolveNearestRestaurantCity(restaurants) {
   const sorted = sortByDistanceAscending(Array.isArray(restaurants) ? restaurants : []);
   for (const restaurant of sorted) {
@@ -87,6 +261,7 @@ export function useMarketplaceData() {
   const [loading, setLoading] = useState(true);
   const [detectedAddress, setDetectedAddress] = useState('');
   const [detectedCity, setDetectedCity] = useState('');
+  const [locationLookupReady, setLocationLookupReady] = useState(false);
   const location = useCurrentLocation();
 
   const refreshPersistedLists = useCallback(async () => {
@@ -149,12 +324,77 @@ export function useMarketplaceData() {
     enabled: !location.loading && !location.error,
     latitude: location.latitude,
     longitude: location.longitude,
+    city: detectedCity,
     radiusKm: 5,
   });
 
+  const nearbyNormalizedRestaurants = useMemo(
+    () =>
+      (nearbyFeed.restaurants || []).map((restaurant) => {
+        const resolvedDistanceKm = resolveRestaurantDistanceKm(
+          restaurant,
+          location.latitude,
+          location.longitude,
+        );
+        if (!Number.isFinite(resolvedDistanceKm)) {
+          return restaurant;
+        }
+        return {
+          ...restaurant,
+          distance_km: Number(resolvedDistanceKm.toFixed(3)),
+        };
+      }),
+    [location.latitude, location.longitude, nearbyFeed.restaurants],
+  );
+
+  const nearbyFilterStats = useMemo(() => {
+    const stats = {
+      total: nearbyNormalizedRestaurants.length,
+      kept: 0,
+      dropped: {
+        invalid_payload: 0,
+        delivery_disabled: 0,
+        missing_distance_or_coords: 0,
+        outside_delivery_range: 0,
+        outside_delivery_city: 0,
+        other: 0,
+      },
+    };
+
+    nearbyNormalizedRestaurants.forEach((restaurant) => {
+      const reason = getRestaurantDeliveryBlockReason(
+        restaurant,
+        detectedCity,
+        location.latitude,
+        location.longitude,
+      );
+      if (!reason) {
+        stats.kept += 1;
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(stats.dropped, reason)) {
+        stats.dropped[reason] += 1;
+        return;
+      }
+      stats.dropped.other += 1;
+    });
+
+    return stats;
+  }, [detectedCity, location.latitude, location.longitude, nearbyNormalizedRestaurants]);
+
   const nearbyRestaurantsByLocation = useMemo(
-    () => sortByDistanceAscending(nearbyFeed.restaurants || []),
-    [nearbyFeed.restaurants],
+    () =>
+      sortByDistanceAscending(
+        nearbyNormalizedRestaurants.filter((restaurant) =>
+          isRestaurantDeliverable(
+            restaurant,
+            detectedCity,
+            location.latitude,
+            location.longitude,
+          ),
+        ),
+      ),
+    [detectedCity, location.latitude, location.longitude, nearbyNormalizedRestaurants],
   );
 
   const nearbyFilteredRestaurants = useMemo(
@@ -175,29 +415,76 @@ export function useMarketplaceData() {
   );
 
   useEffect(() => {
+    logNearbyDebug('pipeline', {
+      location: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        loading: location.loading,
+        error: location.error || null,
+      },
+      detected_city: detectedCity || null,
+      location_lookup_ready: locationLookupReady,
+      nearby_feed: {
+        loading: nearbyFeed.loading,
+        error: nearbyFeed.error || null,
+        total: nearbyFeed.restaurants?.length || 0,
+      },
+      delivery_filter: nearbyFilterStats,
+      final_visible_count: nearbyFilteredRestaurants.length,
+      search_query: searchQuery || '',
+      selected_category: selectedCategory,
+    });
+  }, [
+    detectedCity,
+    location.latitude,
+    location.longitude,
+    location.loading,
+    location.error,
+    locationLookupReady,
+    nearbyFeed.loading,
+    nearbyFeed.error,
+    nearbyFeed.restaurants,
+    nearbyFilterStats,
+    nearbyFilteredRestaurants.length,
+    searchQuery,
+    selectedCategory,
+  ]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function resolveDetectedCity() {
-      if (!Number.isFinite(Number(location.latitude)) || !Number.isFinite(Number(location.longitude))) {
+      if (
+        toFiniteCoordinate(location.latitude) === null ||
+        toFiniteCoordinate(location.longitude) === null
+      ) {
         setDetectedAddress('');
         setDetectedCity('');
+        setLocationLookupReady(true);
         return;
       }
 
-      const [city, address] = await Promise.all([
-        reverseGeocodeCity({
-          latitude: location.latitude,
-          longitude: location.longitude,
-        }),
-        reverseGeocodeAddress({
-          latitude: location.latitude,
-          longitude: location.longitude,
-        }),
-      ]);
+      setLocationLookupReady(false);
+      try {
+        const [city, address] = await Promise.all([
+          reverseGeocodeCity({
+            latitude: location.latitude,
+            longitude: location.longitude,
+          }),
+          reverseGeocodeAddress({
+            latitude: location.latitude,
+            longitude: location.longitude,
+          }),
+        ]);
 
-      if (!cancelled) {
-        setDetectedAddress(address || '');
-        setDetectedCity(city || '');
+        if (!cancelled) {
+          setDetectedAddress(address || '');
+          setDetectedCity(city || '');
+        }
+      } finally {
+        if (!cancelled) {
+          setLocationLookupReady(true);
+        }
       }
     }
 

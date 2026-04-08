@@ -19,9 +19,27 @@ const FALLBACK_RESTAURANTS = [
     supports_pickup: true,
     is_featured: true,
     location: '',
+    city: '',
+    delivery_zone_cities: [],
+    delivery_range_km: 5,
+    delivery_origin_location: '',
+    delivery_origin_lat: null,
+    delivery_origin_lng: null,
     distance_km: null,
   },
 ];
+
+const DEBUG_NEARBY =
+  (typeof __DEV__ !== 'undefined' && __DEV__) ||
+  (typeof process !== 'undefined' && process?.env?.NODE_ENV !== 'production');
+
+function logNearbyDebug(label, payload = {}) {
+  if (!DEBUG_NEARBY) {
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[nearby][service] ${label}`, payload);
+}
 
 function normalizeBoolean(value, fallback = false) {
   if (typeof value === 'boolean') {
@@ -59,6 +77,24 @@ function normalizeCoordinate(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .map((item) => sanitizeText(item))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function normalizeDeliveryRangeKm(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function normalizeRestaurantRecord(record, index) {
   if (!record || typeof record !== 'object') {
     return null;
@@ -94,6 +130,12 @@ function normalizeRestaurantRecord(record, index) {
     supports_pickup: normalizeBoolean(record.supports_pickup, true),
     is_featured: normalizeBoolean(record.is_featured, false),
     location: sanitizeText(record.location),
+    city: sanitizeText(record.city),
+    delivery_zone_cities: normalizeStringArray(record.delivery_zone_cities),
+    delivery_range_km: normalizeDeliveryRangeKm(record.delivery_range_km),
+    delivery_origin_location: sanitizeText(record.delivery_origin_location),
+    delivery_origin_lat: normalizeCoordinate(record.delivery_origin_lat),
+    delivery_origin_lng: normalizeCoordinate(record.delivery_origin_lng),
     distance_km: normalizeDistance(record.distance_km),
     pos_location_lat: normalizeCoordinate(record.pos_location_lat),
     pos_location_lng: normalizeCoordinate(record.pos_location_lng),
@@ -147,23 +189,45 @@ async function fetchMarketplaceFromApi(signal) {
 export async function fetchNearbyRestaurants({
   latitude,
   longitude,
+  city,
   radiusKm = 5,
   signal,
 } = {}) {
   const requestQuery = {
     lat: latitude,
     lng: longitude,
+    city,
     radius: radiusKm,
   };
 
   const nearbyUrl = buildRequestUrl(NEARBY_RESTAURANTS_API_URL, requestQuery);
+  logNearbyDebug('request', {
+    latitude: requestQuery.lat,
+    longitude: requestQuery.lng,
+    city: requestQuery.city || null,
+    radius_km: requestQuery.radius,
+    url: nearbyUrl,
+  });
   try {
     const nearbyRestaurants = await fetchRestaurantsFromApi(nearbyUrl, signal);
+    logNearbyDebug('response', {
+      source: 'nearby_endpoint',
+      count: nearbyRestaurants.length,
+    });
     return nearbyRestaurants;
-  } catch {
+  } catch (error) {
+    logNearbyDebug('fallback', {
+      source: 'marketplace_endpoint',
+      reason: String(error?.message || 'Unknown nearby fetch error'),
+    });
     // Backward-compatible fallback while nearby endpoint is being rolled out.
     const marketplaceUrl = buildRequestUrl(MARKETPLACE_API_URL, requestQuery);
-    return fetchRestaurantsFromApi(marketplaceUrl, signal);
+    const fallbackRestaurants = await fetchRestaurantsFromApi(marketplaceUrl, signal);
+    logNearbyDebug('response', {
+      source: 'marketplace_endpoint',
+      count: fallbackRestaurants.length,
+    });
+    return fallbackRestaurants;
   }
 }
 

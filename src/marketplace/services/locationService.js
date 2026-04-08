@@ -19,6 +19,12 @@ const reverseGeocodePayloadCache = new Map();
 const searchAddressSuggestionsCache = new Map();
 
 function isFiniteNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return false;
+  }
+  if (typeof value === 'boolean') {
+    return false;
+  }
   return Number.isFinite(Number(value));
 }
 

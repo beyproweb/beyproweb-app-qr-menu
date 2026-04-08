@@ -4,13 +4,35 @@ import { fetchNearbyRestaurants } from '../services/marketplaceCatalogService';
 
 const nearbyRestaurantsCache = new Map();
 const inFlightNearbyRequests = new Map();
+const DEBUG_NEARBY =
+  (typeof __DEV__ !== 'undefined' && __DEV__) ||
+  (typeof process !== 'undefined' && process?.env?.NODE_ENV !== 'production');
+
+function logNearbyDebug(label, payload = {}) {
+  if (!DEBUG_NEARBY) {
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[nearby][hook] ${label}`, payload);
+}
 
 function isFiniteCoordinate(value) {
+  if (value === null || value === undefined || value === '') {
+    return false;
+  }
+  if (typeof value === 'boolean') {
+    return false;
+  }
   return Number.isFinite(Number(value));
 }
 
-function toRequestKey(latitude, longitude, radiusKm) {
-  return `${Number(latitude).toFixed(4)}:${Number(longitude).toFixed(4)}:${Number(radiusKm).toFixed(2)}`;
+function normalizeCityQuery(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function toRequestKey(latitude, longitude, radiusKm, city) {
+  const cityKey = normalizeCityQuery(city) || 'na';
+  return `${Number(latitude).toFixed(4)}:${Number(longitude).toFixed(4)}:${Number(radiusKm).toFixed(2)}:${cityKey}`;
 }
 
 const INITIAL_STATE = {
@@ -23,24 +45,36 @@ export function useNearbyRestaurants({
   enabled = true,
   latitude,
   longitude,
+  city = '',
   radiusKm = 5,
 } = {}) {
   const [state, setState] = useState(INITIAL_STATE);
 
   const canFetch = enabled && isFiniteCoordinate(latitude) && isFiniteCoordinate(longitude);
   const requestKey = useMemo(
-    () => (canFetch ? toRequestKey(latitude, longitude, radiusKm) : ''),
-    [canFetch, latitude, longitude, radiusKm],
+    () => (canFetch ? toRequestKey(latitude, longitude, radiusKm, city) : ''),
+    [canFetch, latitude, longitude, radiusKm, city],
   );
 
   useEffect(() => {
     if (!canFetch) {
+      logNearbyDebug('skip_fetch', {
+        enabled,
+        latitude,
+        longitude,
+        city,
+        radiusKm,
+      });
       setState(INITIAL_STATE);
       return undefined;
     }
 
     const cached = nearbyRestaurantsCache.get(requestKey);
     if (cached) {
+      logNearbyDebug('cache_hit', {
+        requestKey,
+        count: cached.length,
+      });
       setState({
         restaurants: cached,
         loading: false,
@@ -50,11 +84,18 @@ export function useNearbyRestaurants({
     }
 
     let cancelled = false;
+    logNearbyDebug('start_fetch', {
+      requestKey,
+      latitude,
+      longitude,
+      city,
+      radiusKm,
+    });
     setState((previous) => ({ ...previous, loading: true, error: null }));
 
     let requestPromise = inFlightNearbyRequests.get(requestKey);
     if (!requestPromise) {
-      requestPromise = fetchNearbyRestaurants({ latitude, longitude, radiusKm });
+      requestPromise = fetchNearbyRestaurants({ latitude, longitude, city, radiusKm });
       inFlightNearbyRequests.set(requestKey, requestPromise);
     }
 
@@ -64,6 +105,10 @@ export function useNearbyRestaurants({
           return;
         }
         const safeRestaurants = Array.isArray(restaurants) ? restaurants : [];
+        logNearbyDebug('fetch_success', {
+          requestKey,
+          count: safeRestaurants.length,
+        });
         nearbyRestaurantsCache.set(requestKey, safeRestaurants);
         setState({
           restaurants: safeRestaurants,
@@ -75,10 +120,15 @@ export function useNearbyRestaurants({
         if (cancelled) {
           return;
         }
+        const errorMessage = String(error?.message || 'Unable to load nearby restaurants');
+        logNearbyDebug('fetch_error', {
+          requestKey,
+          error: errorMessage,
+        });
         setState({
           restaurants: [],
           loading: false,
-          error: String(error?.message || 'Unable to load nearby restaurants'),
+          error: errorMessage,
         });
       })
       .finally(() => {
@@ -91,7 +141,7 @@ export function useNearbyRestaurants({
     return () => {
       cancelled = true;
     };
-  }, [canFetch, latitude, longitude, radiusKm, requestKey]);
+  }, [canFetch, latitude, longitude, city, radiusKm, requestKey]);
 
   return state;
 }

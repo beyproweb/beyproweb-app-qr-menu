@@ -19,6 +19,22 @@ const rawMarketplaceApiUrl = process.env.EXPO_PUBLIC_MARKETPLACE_API_URL;
 const rawNearbyRestaurantsApiUrl = process.env.EXPO_PUBLIC_NEARBY_RESTAURANTS_API_URL;
 const rawMarketplaceAuthApiUrl = process.env.EXPO_PUBLIC_MARKETPLACE_AUTH_API_URL;
 
+function deriveNearbyUrlFromMarketplaceUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    const normalizedPath = String(url.pathname || '').replace(/\/+$/, '');
+    if (normalizedPath.endsWith('/marketplace/restaurants')) {
+      url.pathname = normalizedPath.replace(/\/marketplace\/restaurants$/, '/restaurants/nearby');
+      return url.toString();
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 function readHostFromBaseUrl(baseUrl) {
   const parsed = safeParseUrl(baseUrl);
   return parsed ? parsed.host : '';
@@ -30,8 +46,11 @@ export const MARKETPLACE_API_URL = normalizeBaseUrl(
   rawMarketplaceApiUrl,
   DEFAULT_MARKETPLACE_API_URL,
 );
+const derivedNearbyRestaurantsApiUrl = deriveNearbyUrlFromMarketplaceUrl(
+  rawNearbyRestaurantsApiUrl || rawMarketplaceApiUrl,
+);
 export const NEARBY_RESTAURANTS_API_URL = normalizeBaseUrl(
-  rawNearbyRestaurantsApiUrl,
+  rawNearbyRestaurantsApiUrl || derivedNearbyRestaurantsApiUrl,
   DEFAULT_NEARBY_RESTAURANTS_API_URL,
 );
 export const MARKETPLACE_AUTH_API_URL = normalizeBaseUrl(

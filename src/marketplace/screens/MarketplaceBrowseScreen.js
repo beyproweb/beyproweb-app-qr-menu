@@ -220,7 +220,7 @@ function NearbySkeletonRow() {
   );
 }
 
-function EventCard({ index, onOpenTickets, restaurant }) {
+function EventCard({ index, onOpenRestaurant, onOpenTickets, restaurant }) {
   if (!restaurant) {
     return null;
   }
@@ -233,7 +233,7 @@ function EventCard({ index, onOpenTickets, restaurant }) {
   return (
     <View style={styles.eventCard}>
       <Pressable
-        onPress={() => onOpenTickets?.(restaurant.slug)}
+        onPress={() => onOpenRestaurant?.(restaurant.slug)}
         style={({ pressed }) => [styles.eventImageWrap, pressed ? styles.scalePressed : null]}
       >
         {imageUri ? (
@@ -676,6 +676,7 @@ export function MarketplaceBrowseScreen({
             <EventCard
               index={index}
               key={`${restaurant.id}-event`}
+              onOpenRestaurant={onOpenRestaurant}
               onOpenTickets={onOpenTickets || onOpenRestaurant}
               restaurant={restaurant}
             />
@@ -1021,6 +1022,8 @@ const styles = StyleSheet.create({
   searchInputInHeader: {
     fontSize: 12,
     minHeight: 30,
+    outlineStyle: 'none',
+    outlineWidth: 0,
   },
   bottomLogoWrap: {
     alignItems: 'center',
